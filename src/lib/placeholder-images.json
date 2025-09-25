@@ -1,3 +1,64 @@
 {
-  "placeholderImages": []
+  "placeholderImages": [
+    {
+      "id": "student-1",
+      "description": "Avatar for Liam Johnson",
+      "imageUrl": "https://images.unsplash.com/photo-1740677584609-b3139498b608?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw2fHxib3klMjBzbWlsaW5nfGVufDB8fHx8MTc1ODc1ODUxMnww&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "boy smiling"
+    },
+    {
+      "id": "student-2",
+      "description": "Avatar for Olivia Smith",
+      "imageUrl": "https://images.unsplash.com/photo-1527285286036-1ae743926077?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw1fHxnaXJsJTIwZ2xhc3Nlc3xlbnwwfHx8fDE3NTg3NTg1MTB8MA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "girl glasses"
+    },
+    {
+      "id": "student-3",
+      "description": "Avatar for Noah Williams",
+      "imageUrl": "https://images.unsplash.com/photo-1520269061773-41fa366ffdde?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwzfHxib3klMjByZWRoZWFkfGVufDB8fHx8MTc1ODgwNDg4OXww&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "boy redhead"
+    },
+    {
+      "id": "student-4",
+      "description": "Avatar for Emma Brown",
+      "imageUrl": "https://images.unsplash.com/photo-1647621148696-ba59c4d8fca1?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw5fHxnaXJsJTIwcGlndGFpbHN8ZW58MHx8fHwxNzU4NzA2NDUyfDA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "girl pigtails"
+    },
+    {
+      "id": "student-5",
+      "description": "Avatar for Oliver Jones",
+      "imageUrl": "https://images.unsplash.com/photo-1556151048-36b7528a029b?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw5fHxib3klMjBoYXR8ZW58MHx8fHwxNzU4ODA0ODg4fDA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "boy hat"
+    },
+    {
+      "id": "student-6",
+      "description": "Avatar for Ava Garcia",
+      "imageUrl": "https://images.unsplash.com/photo-1489507423881-4df2d5eb5d06?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw5fHxnaXJsJTIwc21pbGluZ3xlbnwwfHx8fDE3NTg4MDQ4ODl8MA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "girl smiling"
+    },
+    {
+      "id": "student-7",
+      "description": "Avatar for Elijah Miller",
+      "imageUrl": "https://images.unsplash.com/photo-1500757810556-5d600d9b737d?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwxfHxib3klMjBnbGFzc2VzfGVufDB8fHx8MTc1ODcyODc4OHww&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "boy glasses"
+    },
+    {
+      "id": "student-8",
+      "description": "Avatar for Charlotte Davis",
+      "imageUrl": "https://images.unsplash.com/photo-1613761440658-8d94c13adc81?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwzfHxnaXJsJTIwY3VybHklMjBoYWlyfGVufDB8fHx8MTc1ODgwNDg4OXww&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "girl curly hair"
+    },
+    {
+      "id": "teacher-avatar",
+      "description": "Avatar for teacher",
+      "imageUrl": "https://images.unsplash.com/photo-1580489944761-15a19d654956?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwxfHx3b21hbiUyMHNtaWxpbmd8ZW58MHx8fHwxNzU4NzU5NDE0fDA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "woman smiling"
+    },
+    {
+      "id": "admin-avatar",
+      "description": "Avatar for admin",
+      "imageUrl": "https://images.unsplash.com/photo-1562788869-4ed32648eb72?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwyfHxtYW4lMjBwcm9mZXNzaW9uYWx8ZW58MHx8fHwxNzU4Nzg4OTg2fDA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "man professional"
+    }
+  ]
 }
