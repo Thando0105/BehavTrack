@@ -27,7 +27,6 @@ interface StudentRosterProps {
 }
 
 export function StudentRoster({ students }: StudentRosterProps) {
-  const getHref = (path: string) => `${path}`;
 
   return (
     <Table>
@@ -45,12 +44,12 @@ export function StudentRoster({ students }: StudentRosterProps) {
         {students.map(student => (
           <TableRow key={student.id}>
             <TableCell>
-              <Link href={getHref(`/students/${student.id}`)} className="flex items-center gap-3 hover:underline">
+              <Link href={`/students/${student.id}`} className="flex items-center gap-3 font-medium hover:underline">
                 <Avatar className="h-9 w-9">
                   <AvatarImage src={student.avatarUrl} alt={student.name} data-ai-hint={student.imageHint}/>
                   <AvatarFallback>{student.name.charAt(0)}</AvatarFallback>
                 </Avatar>
-                <div className="font-medium">{student.name}</div>
+                {student.name}
               </Link>
             </TableCell>
             <TableCell className="hidden md:table-cell">
@@ -68,7 +67,7 @@ export function StudentRoster({ students }: StudentRosterProps) {
                 <DropdownMenuContent align="end">
                   <DropdownMenuLabel>Actions</DropdownMenuLabel>
                   <DropdownMenuItem asChild>
-                    <Link href={getHref(`/students/${student.id}`)}>View Details</Link>
+                    <Link href={`/students/${student.id}`}>View Details</Link>
                   </DropdownMenuItem>
                   <DropdownMenuItem>Log Incident</DropdownMenuItem>
                 </DropdownMenuContent>

@@ -35,7 +35,6 @@ export function AppSidebar() {
   const { data: userData, isLoading: isUserDataLoading } = useDoc<UserData>(userRef);
 
   const role = userData?.role;
-  const getHref = (path: string) => `${path}`;
 
   const menuItems = [
     { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
@@ -61,19 +60,17 @@ export function AppSidebar() {
         <SidebarMenu>
           {menuItems.map(item => (
             <SidebarMenuItem key={item.label}>
-              <Link href={getHref(item.href)} passHref legacyBehavior>
-                <SidebarMenuButton
-                  asChild={item.disabled}
-                  disabled={item.disabled}
-                  isActive={pathname === item.href}
-                  className={cn(pathname === item.href && "font-semibold")}
-                >
-                  <a>
-                    <item.icon className="h-5 w-5" />
-                    <span>{item.label}</span>
-                  </a>
-                </SidebarMenuButton>
-              </Link>
+              <SidebarMenuButton
+                asChild
+                disabled={item.disabled}
+                isActive={pathname === item.href}
+                className={cn(pathname === item.href && "font-semibold")}
+              >
+                <Link href={item.href}>
+                  <item.icon className="h-5 w-5" />
+                  <span>{item.label}</span>
+                </Link>
+              </SidebarMenuButton>
             </SidebarMenuItem>
           ))}
         </SidebarMenu>
