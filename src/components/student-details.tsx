@@ -35,22 +35,23 @@ export function StudentDetails({ student }: StudentDetailsProps) {
   const incidentsQuery = useMemoFirebase(() => {
     if (!firestore || !student.id || !user || !userData) return null;
     
+    // Admins can see all incidents for a student
     if (userData.role === 'admin') {
       return query(collection(firestore, 'incidents'), where('studentId', '==', student.id));
     }
     
+    // Teachers can only see incidents for students in their class.
+    // This query is secured by Firestore rules.
     if (userData.role === 'teacher') {
-      // Teachers should see all incidents for a student in their class, not just their own.
-      // The security rules will enforce they can only read from their class.
       return query(
         collection(firestore, 'incidents'), 
         where('studentId', '==', student.id),
-        where('classId', '==', student.classId)
+        where('classId', '==', userData.classId)
       );
     }
     
     return null;
-  }, [firestore, student.id, student.classId, user, userData]);
+  }, [firestore, student.id, user, userData]);
 
   const { data: incidents, isLoading: areIncidentsLoading } = useCollection<Incident>(incidentsQuery);
   const sortedIncidents = useMemo(() => 
@@ -80,7 +81,7 @@ export function StudentDetails({ student }: StudentDetailsProps) {
     });
   };
 
-  const canLogIncident = userData?.role === 'teacher';
+  const canLogIncident = userData?.role === 'teacher' && userData?.classId === student.classId;
 
   return (
     <>
@@ -92,7 +93,7 @@ export function StudentDetails({ student }: StudentDetailsProps) {
       <main className="flex flex-1 flex-col gap-4 p-4 md:gap-8 md:p-6">
         <div className="flex items-center gap-4">
           <Button variant="outline" size="icon" asChild>
-            <Link href={userData?.role === 'admin' ? '/manage-students' : '/dashboard'}>
+            <Link href={userData?.role === 'admin' ? '/students' : '/dashboard'}>
               <ArrowLeft className="h-4 w-4" />
               <span className="sr-only">Back</span>
             </Link>
@@ -135,7 +136,18 @@ export function StudentDetails({ student }: StudentDetailsProps) {
               </CardContent>
             </Card>
 
-            {summary && (
+            {isPending && (
+              <Card>
+                <CardContent className="p-6">
+                  <div className="flex items-center justify-center">
+                    <Loader2 className="mr-2 h-6 w-6 animate-spin" />
+                    <p className="text-muted-foreground">Generating AI summary...</p>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+            
+            {summary && !isPending && (
               <Card>
                 <CardHeader>
                   <CardTitle className="font-headline flex items-center gap-2">

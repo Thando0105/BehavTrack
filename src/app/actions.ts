@@ -3,8 +3,8 @@
 
 import { z } from 'zod';
 import { generateWeeklyBehaviorSummary } from '@/ai/flows/generate-weekly-behavior-summary';
-import { getFirestore, collection, query, where, getDocs } from 'firebase/firestore';
-import { initializeFirebase } from '@/firebase'; // Use our own initialize
+import { getFirestore, collection, query, where, getDocs, Timestamp } from 'firebase-admin/firestore';
+import { getAdminApp } from '@/firebase/admin';
 import type { Incident } from '@/lib/types';
 
 
@@ -18,17 +18,16 @@ export async function getStudentSummary(formData: FormData) {
       studentId: formData.get('studentId'),
     });
 
-    const { firestore } = initializeFirebase();
+    const adminApp = getAdminApp();
+    const firestore = getFirestore(adminApp);
     
-    // Simulate fetching incidents for the past week
     const oneWeekAgo = new Date();
     oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
-    const oneWeekAgoISO = oneWeekAgo.toISOString();
 
     const incidentsRef = collection(firestore, 'incidents');
     const q = query(incidentsRef, 
         where('studentId', '==', validatedData.studentId),
-        where('dateTime', '>=', oneWeekAgoISO)
+        where('dateTime', '>=', oneWeekAgo.toISOString())
     );
 
     const querySnapshot = await getDocs(q);
@@ -40,7 +39,7 @@ export async function getStudentSummary(formData: FormData) {
     if (recentIncidents.length === 0) {
         return {
             summaryText: "No incidents recorded in the last week.",
-            suggestedActions: "Continue to monitor student behavior."
+            suggestedActions: "Continue to monitor student behavior and reinforce positive actions."
         }
     }
 
@@ -54,6 +53,8 @@ export async function getStudentSummary(formData: FormData) {
       }))
     });
 
+    // TODO: Save summary to 'summaries' collection
+    
     return summary;
   } catch (error) {
     console.error('Error generating summary:', error);

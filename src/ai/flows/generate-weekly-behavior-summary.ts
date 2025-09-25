@@ -25,8 +25,8 @@ const GenerateWeeklyBehaviorSummaryInputSchema = z.object({
 export type GenerateWeeklyBehaviorSummaryInput = z.infer<typeof GenerateWeeklyBehaviorSummaryInputSchema>;
 
 const GenerateWeeklyBehaviorSummaryOutputSchema = z.object({
-  summaryText: z.string().describe('A summary of the student\'s behavior for the week.'),
-  suggestedActions: z.string().describe('Recommended interventions or actions based on the summary.'),
+  summaryText: z.string().describe('A professional, constructive summary of the student\'s weekly behavior, under 200 words, focusing on trends and possible causes/patterns.'),
+  suggestedActions: z.string().describe('A list of suggested interventions based on the behavior summary.'),
 });
 export type GenerateWeeklyBehaviorSummaryOutput = z.infer<typeof GenerateWeeklyBehaviorSummaryOutputSchema>;
 
@@ -38,17 +38,16 @@ const prompt = ai.definePrompt({
   name: 'generateWeeklyBehaviorSummaryPrompt',
   input: {schema: GenerateWeeklyBehaviorSummaryInputSchema},
   output: {schema: GenerateWeeklyBehaviorSummaryOutputSchema},
-  prompt: `You are an AI assistant helping teachers understand student behavior.
-  Given the following incidents for student ID {{{studentId}}} during the week starting {{{weekStart}}}, generate a summary of the student\'s behavior, highlighting trends and patterns.
-  Also, suggest possible actions or interventions that the teacher could take.
+  prompt: `You are an expert educational psychologist. Summarize this student's weekly behavior using the logs below for the week starting {{{weekStart}}}.
+  Focus on: trends, possible causes/patterns, and suggested interventions.
+  Write under 200 words in a professional, constructive tone.
 
   Incidents:
   {{#each incidents}}
   - Date/Time: {{dateTime}}, Severity: {{severity}}, Description: {{description}}
   {{/each}}
 
-  Summary should be concise but informative. Suggested actions should be practical and actionable.
-  Ensure that the summary and suggested actions are tailored to the specific incidents provided.
+  If there are no incidents, state that the student had a clear week with no behavioral issues logged.
 `,
 });
 
