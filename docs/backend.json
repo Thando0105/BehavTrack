@@ -1,3 +1,4 @@
+
 {
   "entities": {
     "User": {
@@ -170,92 +171,35 @@
     ]
   },
   "firestore": {
-    "structure": [
-      {
-        "path": "/users/{userId}",
-        "definition": {
-          "entityName": "User",
-          "schema": {
-            "$ref": "#/backend/entities/User"
-          },
-          "description": "Stores user data. Uses path-based ownership for access control.",
-          "params": [
-            {
-              "name": "userId",
-              "description": "The unique ID of the user, matching the Firebase Auth UID."
-            }
-          ]
-        }
+    "/users/{userId}": {
+      "schema": {
+        "$ref": "#/entities/User"
       },
-      {
-        "path": "/classes/{classId}",
-        "definition": {
-          "entityName": "Class",
-          "schema": {
-            "$ref": "#/backend/entities/Class"
-          },
-          "description": "Stores class data.",
-          "params": [
-            {
-              "name": "classId",
-              "description": "The unique ID of the class."
-            }
-          ]
-        }
+      "description": "Stores user data. Uses path-based ownership for access control."
+    },
+    "/classes/{classId}": {
+      "schema": {
+        "$ref": "#/entities/Class"
       },
-      {
-        "path": "/classes/{classId}/students/{studentId}",
-        "definition": {
-          "entityName": "Student",
-          "schema": {
-            "$ref": "#/backend/entities/Student"
-          },
-          "description": "Stores student data. Organized under classes for easy querying.  Includes denormalized 'classId'.",
-          "params": [
-            {
-              "name": "classId",
-              "description": "The unique ID of the class to which the student belongs."
-            },
-            {
-              "name": "studentId",
-              "description": "The unique ID of the student."
-            }
-          ]
-        }
+      "description": "Stores class data."
+    },
+    "/classes/{classId}/students/{studentId}": {
+      "schema": {
+        "$ref": "#/entities/Student"
       },
-      {
-        "path": "/incidents/{incidentId}",
-        "definition": {
-          "entityName": "Incident",
-          "schema": {
-            "$ref": "#/backend/entities/Incident"
-          },
-          "description": "Stores incident data. Includes denormalized 'teacherId' and 'classId' for authorization independence.",
-          "params": [
-            {
-              "name": "incidentId",
-              "description": "The unique ID of the incident."
-            }
-          ]
-        }
+      "description": "Stores student data. Organized under classes for easy querying.  Includes denormalized 'classId'."
+    },
+    "/incidents/{incidentId}": {
+      "schema": {
+        "$ref": "#/entities/Incident"
       },
-      {
-        "path": "/summaries/{summaryId}",
-        "definition": {
-          "entityName": "Summary",
-          "schema": {
-            "$ref": "#/backend/entities/Summary"
-          },
-          "description": "Stores AI-generated summaries of student behavior.",
-          "params": [
-            {
-              "name": "summaryId",
-              "description": "The unique ID of the summary."
-            }
-          ]
-        }
-      }
-    ],
-    "reasoning": "The Firestore structure is designed to support the BehavTrack application's requirements for user authentication, role-based access control, student behavior tracking, and AI-powered summaries. The primary goal is to ensure data security, scalability, and ease of querying while adhering to the principles of Authorization Independence and Structural Segregation.\n\n**Authorization Independence (CRITICAL):** To avoid hierarchical authorization dependencies, key authorization data (such as classId for teachers) is denormalized into the `incidents` collection. This allows security rules to validate access without needing to perform `get()` operations on parent documents, enabling atomic transactions and improving performance.\n\n**Structural Segregation:** The data is segregated into collections based on entity type (users, students, classes, incidents, summaries) to maintain a homogeneous security posture within each collection.\n\n**QAPs (Rules are not Filters):** Access control is implemented through a combination of path-based ownership (e.g., `/users/{userId}`) and denormalized authorization data (`classId` in `incidents`). This enables secure list operations, as the rules can efficiently filter data based on the user's role and class membership.\n\n**Access Modeling:**\n*   **Users:** Stored in the `/users/{userId}` collection for path-based ownership.\n*   **Students:** Stored in the `/classes/{classId}/students/{studentId}` collection to easily query students in a class and ensure teachers can only view students belonging to their classes.\n*   **Incidents:** Stored in the `/incidents/{incidentId}` collection, with denormalized `teacherId` and `classId` fields to enforce teacher-level access control without additional `get()` calls. Also, store the incidents as subcollection inside the student document.\n*   **Summaries:** Stored in the `/summaries/{summaryId}` collection, associated with `studentId` to facilitate the generation of weekly summaries."
+      "description": "Stores incident data. Includes denormalized 'teacherId' and 'classId' for authorization independence."
+    },
+    "/summaries/{summaryId}": {
+      "schema": {
+        "$ref": "#/entities/Summary"
+      },
+      "description": "Stores AI-generated summaries of student behavior."
+    }
   }
 }
