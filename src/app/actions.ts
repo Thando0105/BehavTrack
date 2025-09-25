@@ -1,9 +1,12 @@
+
 'use server';
 
 import { z } from 'zod';
-import { incidents as allIncidents, students } from '@/lib/data';
-import type { Incident } from '@/lib/types';
 import { generateWeeklyBehaviorSummary } from '@/ai/flows/generate-weekly-behavior-summary';
+import { getFirestore, collection, query, where, getDocs } from 'firebase/firestore';
+import { initializeFirebase } from '@/firebase'; // Use our own initialize
+import type { Incident } from '@/lib/types';
+
 
 const actionSchema = z.object({
   studentId: z.string(),
@@ -15,20 +18,24 @@ export async function getStudentSummary(formData: FormData) {
       studentId: formData.get('studentId'),
     });
 
-    const student = students.find((s) => s.id === validatedData.studentId);
-    if (!student) {
-      throw new Error('Student not found');
-    }
-
-    const studentIncidents = allIncidents.filter(
-      (i) => i.studentId === validatedData.studentId
-    );
+    const { firestore } = initializeFirebase();
     
     // Simulate fetching incidents for the past week
     const oneWeekAgo = new Date();
     oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
+    const oneWeekAgoISO = oneWeekAgo.toISOString();
 
-    const recentIncidents = studentIncidents.filter(i => new Date(i.dateTime) > oneWeekAgo);
+    const incidentsRef = collection(firestore, 'incidents');
+    const q = query(incidentsRef, 
+        where('studentId', '==', validatedData.studentId),
+        where('dateTime', '>=', oneWeekAgoISO)
+    );
+
+    const querySnapshot = await getDocs(q);
+    const recentIncidents: Incident[] = [];
+    querySnapshot.forEach((doc) => {
+        recentIncidents.push({ id: doc.id, ...doc.data() } as Incident);
+    });
 
     if (recentIncidents.length === 0) {
         return {
@@ -37,9 +44,8 @@ export async function getStudentSummary(formData: FormData) {
         }
     }
 
-
     const summary = await generateWeeklyBehaviorSummary({
-      studentId: student.id,
+      studentId: validatedData.studentId,
       weekStart: oneWeekAgo.toISOString().split('T')[0],
       incidents: recentIncidents.map(i => ({
         dateTime: i.dateTime,
@@ -54,6 +60,10 @@ export async function getStudentSummary(formData: FormData) {
     if (error instanceof z.ZodError) {
       return { error: 'Invalid input.', details: error.errors };
     }
-    return { error: 'Failed to generate summary.' };
+    // Check if error is an object with a message property
+    if (error && typeof error === 'object' && 'message' in error) {
+      return { error: `Failed to generate summary: ${error.message}` };
+    }
+    return { error: 'An unknown error occurred while generating the summary.' };
   }
 }

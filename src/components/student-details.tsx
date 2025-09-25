@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useTransition, useMemo } from 'react';
@@ -38,15 +39,21 @@ export function StudentDetails({ student }: StudentDetailsProps) {
   const incidentsQuery = useMemoFirebase(() => {
     if (!firestore || !student.id || !userData || !user) return null;
     
-    let q = query(collection(firestore, 'incidents'), where('studentId', '==', student.id));
-
-    // If the user is a teacher, they can only see incidents they created.
-    if (userData.role === 'teacher') {
-      q = query(q, where('teacherId', '==', user.uid));
+    // Admins can see all incidents for the student.
+    if (userData.role === 'admin') {
+      return query(collection(firestore, 'incidents'), where('studentId', '==', student.id));
     }
-    // Admins can see all incidents for the student, so no extra filter is needed.
     
-    return q;
+    // If the user is a teacher, they can only see incidents they created for that student.
+    if (userData.role === 'teacher') {
+      return query(
+        collection(firestore, 'incidents'), 
+        where('studentId', '==', student.id),
+        where('teacherId', '==', user.uid)
+      );
+    }
+    
+    return null; // Return null if user role is not determined
   }, [firestore, student.id, userData, user]);
 
   const { data: incidents, isLoading: areIncidentsLoading } = useCollection<Incident>(incidentsQuery);
