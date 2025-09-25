@@ -1,11 +1,11 @@
 'use client';
 
-import { useState, useTransition } from 'react';
-import { Loader2, PlusCircle, Sparkles } from 'lucide-react';
+import { useState, useTransition, useMemo } from 'react';
+import { Loader2, PlusCircle, Sparkles, ArrowLeft } from 'lucide-react';
+import Link from 'next/link';
 
 import { getStudentSummary } from '@/app/actions';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
@@ -14,22 +14,35 @@ import { IncidentLog } from './incident-log';
 import { LogIncidentDialog } from './log-incident-dialog';
 import type { GenerateWeeklyBehaviorSummaryOutput } from '@/ai/flows/generate-weekly-behavior-summary';
 import { AppHeader } from './app-header';
-import Link from 'next/link';
-import { useSearchParams } from 'next/navigation';
+import { useFirebase } from '@/firebase';
+import { collection, query, where, doc } from 'firebase/firestore';
+import { useCollection, useDoc, useMemoFirebase } from '@/firebase/firestore/use-collection';
 
 interface StudentDetailsProps {
   student: Student;
-  initialIncidents: Incident[];
+  initialIncidents: Incident[]; // This will now be fed from the real-time hook
 }
 
-export function StudentDetails({ student, initialIncidents }: StudentDetailsProps) {
+export function StudentDetails({ student }: StudentDetailsProps) {
   const [isPending, startTransition] = useTransition();
   const { toast } = useToast();
-  const searchParams = useSearchParams();
+  const { firestore, user } = useFirebase();
 
-  const [incidents, setIncidents] = useState<Incident[]>(initialIncidents);
   const [summary, setSummary] = useState<GenerateWeeklyBehaviorSummaryOutput | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  
+  // Real-time incidents
+  const incidentsQuery = useMemoFirebase(() => {
+    if (!firestore || !student.id) return null;
+    return query(collection(firestore, 'incidents'), where('studentId', '==', student.id));
+  }, [firestore, student.id]);
+
+  const { data: incidents, isLoading: areIncidentsLoading } = useCollection<Incident>(incidentsQuery);
+  const sortedIncidents = useMemo(() => 
+    (incidents || []).sort((a, b) => new Date(b.dateTime).getTime() - new Date(a.dateTime).getTime()),
+    [incidents]
+  );
+
 
   const handleGenerateSummary = () => {
     startTransition(async () => {
@@ -53,23 +66,9 @@ export function StudentDetails({ student, initialIncidents }: StudentDetailsProp
     });
   };
 
-  const handleIncidentLogged = (newIncidentData: {
-    severity: 'low' | 'medium' | 'high';
-    description: string;
-  }) => {
-    const newIncident: Incident = {
-      id: `inc-${Date.now()}`,
-      studentId: student.id,
-      teacherId: 't-1', // Mocked teacher ID
-      dateTime: new Date().toISOString(),
-      ...newIncidentData,
-    };
-    setIncidents(prevIncidents => [newIncident, ...prevIncidents]);
+  const handleIncidentLogged = () => {
+    // This function is now a no-op because the useCollection hook will automatically update the UI.
   };
-  
-  const role = searchParams.get('role');
-  const getHref = (path: string) => `${path}?role=${role}`;
-
 
   return (
     <>
@@ -82,8 +81,8 @@ export function StudentDetails({ student, initialIncidents }: StudentDetailsProp
       <main className="flex flex-1 flex-col gap-4 p-4 md:gap-8 md:p-6">
         <div className="flex items-center gap-4">
           <Button variant="outline" size="icon" asChild>
-            <Link href={getHref('/dashboard')}>
-              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4"><path d="m12 19-7-7 7-7"/><path d="M19 12H5"/></svg>
+            <Link href="/dashboard">
+              <ArrowLeft className="h-4 w-4" />
               <span className="sr-only">Back</span>
             </Link>
           </Button>
@@ -146,7 +145,7 @@ export function StudentDetails({ student, initialIncidents }: StudentDetailsProp
           </div>
 
           <div className="md:col-span-2">
-            <IncidentLog incidents={incidents} />
+            {areIncidentsLoading ? <div>Loading incidents...</div> : <IncidentLog incidents={sortedIncidents} />}
           </div>
         </div>
       </main>

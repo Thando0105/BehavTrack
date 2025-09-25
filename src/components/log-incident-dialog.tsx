@@ -3,6 +3,8 @@
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
+import { collection, addDoc } from 'firebase/firestore';
+import { useFirebase } from '@/firebase';
 
 import { Button } from '@/components/ui/button';
 import {
@@ -29,8 +31,9 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import type { Student } from '@/lib/types';
+import type { Student, Incident } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
+import { addDocumentNonBlocking } from '@/firebase';
 
 const incidentSchema = z.object({
   severity: z.enum(['low', 'medium', 'high'], {
@@ -45,7 +48,7 @@ interface LogIncidentDialogProps {
   student: Student;
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onIncidentLogged: (incident: z.infer<typeof incidentSchema>) => void;
+  onIncidentLogged: (incident: Incident) => void;
 }
 
 export function LogIncidentDialog({
@@ -55,6 +58,7 @@ export function LogIncidentDialog({
   onIncidentLogged,
 }: LogIncidentDialogProps) {
   const { toast } = useToast();
+  const { firestore, user } = useFirebase();
 
   const form = useForm<z.infer<typeof incidentSchema>>({
     resolver: zodResolver(incidentSchema),
@@ -64,8 +68,24 @@ export function LogIncidentDialog({
     },
   });
 
-  function onSubmit(values: z.infer<typeof incidentSchema>) {
-    onIncidentLogged(values);
+  async function onSubmit(values: z.infer<typeof incidentSchema>) {
+    if (!user || !firestore) {
+      toast({ variant: 'destructive', title: 'Error', description: 'You must be logged in.' });
+      return;
+    }
+
+    const newIncident: Omit<Incident, 'id'> = {
+      studentId: student.id,
+      teacherId: user.uid,
+      dateTime: new Date().toISOString(),
+      severity: values.severity,
+      description: values.description,
+    };
+
+    const incidentsCol = collection(firestore, 'incidents');
+    await addDocumentNonBlocking(incidentsCol, newIncident);
+
+    // No longer need onIncidentLogged for local state. This will be handled by real-time listener.
     toast({
       title: 'Incident Logged',
       description: `A new incident has been logged for ${student.name}.`,

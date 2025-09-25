@@ -1,11 +1,13 @@
 export type UserRole = 'teacher' | 'admin';
 
 export interface User {
-  id: string;
-  name: string;
+  id: string; // This will be the Firestore document ID
+  uid: string; // This is the Firebase Auth user ID
+  name?: string;
   email: string;
   role: UserRole;
-  avatarUrl: string;
+  avatarUrl?: string;
+  classId?: string; // Only for teachers
 }
 
 export interface Student {

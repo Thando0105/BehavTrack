@@ -33,8 +33,8 @@ export const incidents: Incident[] = [
   { id: 'inc-11', studentId: '8', teacherId: 't-2', dateTime: daysAgo(2), severity: 'medium', description: 'Left classroom without permission.' },
   { id: 'inc-12', studentId: '3', teacherId: 't-1', dateTime: daysAgo(1), severity: 'low', description: 'Made progress on his focus today.' },
 ];
-
-export const users: Record<string, User> = {
-  teacher: { id: 't-1', name: 'Sarah Wilson', email: 's.wilson@school.edu', role: 'teacher', avatarUrl: getImage('teacher-avatar') },
-  admin: { id: 'a-1', name: 'David Chen', email: 'd.chen@school.edu', role: 'admin', avatarUrl: getImage('admin-avatar') }
-};
+// NOTE: The `users` export is no longer needed as user data will come from Firestore.
+// export const users: Record<string, User> = {
+//   teacher: { id: 't-1', name: 'Sarah Wilson', email: 's.wilson@school.edu', role: 'teacher', avatarUrl: getImage('teacher-avatar') },
+//   admin: { id: 'a-1', name: 'David Chen', email: 'd.chen@school.edu', role: 'admin', avatarUrl: getImage('admin-avatar') }
+// };
