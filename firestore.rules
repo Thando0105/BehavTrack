@@ -1,146 +1,121 @@
 /**
- * @file Firestore Security Rules
- * @description This ruleset enforces role-based access control for the BehavTrack application.
+ * @fileoverview Firestore Security Rules for BehavTrack application.
  *
  * Core Philosophy:
- * Access is strictly controlled based on user roles (teacher, admin) and data ownership.
- * Teachers can only access data related to their assigned class.
- * Admins have full access to all data.
- * The backend AI function is the only entity allowed to create summaries.
+ * This ruleset enforces a role-based access control model, with 'admin' and 'teacher' roles.
+ * User data is stored under `/users/{userId}` and is accessible only to the owner.
+ * Teachers can create student and incident records for their assigned classes. Admins have full access.
  *
  * Data Structure:
- * - /users/{userId}: Stores user profiles, with the document ID matching the user's UID.
+ * - /users/{userId}: Stores user profiles, with role and classId.
  * - /students/{studentId}: Stores student data.
  * - /incidents/{incidentId}: Stores incident reports.
  * - /summaries/{summaryId}: Stores AI-generated summaries.
  *
  * Key Security Decisions:
- * - User listing is disallowed.
- * - Teachers can only read summaries and incidents related to students in their class.
- * - Only the backend AI function can create summaries.
- * - Data validation is relaxed to allow for rapid prototyping. Only essential authorization fields are validated.
+ * - User listing is disallowed for privacy.
+ * - Teachers are restricted to creating students and incidents within their assigned class.
  *
  * Denormalization for Authorization:
- * The `classId` is duplicated on both the `Student`, `Incident` and `Summary` documents. This allows rules to efficiently check if a teacher has access to a student's data based on class assignment.
+ * - Incident documents must contain a `classId` field to allow teachers to create incidents only for their assigned classes.
  */
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
     /**
-     * @description Controls access to user profiles.
+     * @description Secures user profiles.
      * @path /users/{userId}
-     * @allow (create) User with UID 'user123' can create their profile.
-     * @allow (get) User with UID 'user123' can read their profile.
-     * @allow (update) User with UID 'user123' can update their profile.
-     * @allow (delete) User with UID 'user123' can delete their profile.
-     * @deny (create) User with UID 'user123' cannot create a profile with a different UID.
-     * @deny (get) Another user cannot read user123's profile.
-     * @deny (update) Another user cannot modify user123's profile.
-     * @deny (delete) Another user cannot delete user123's profile.
-     * @principle Enforces document ownership for all operations on user profiles.
+     * @allow (create) - If the user's UID matches the document ID.
+     * @allow (get, update, delete) - If the requesting user's UID matches the document ID (owner).
+     * @deny (list) - User listing is disallowed.
+     * @deny (create) - If the user's UID does not match the document ID.
+     * @principle Enforces user ownership for all data access.
      */
     match /users/{userId} {
-      allow get: if isOwner(userId);
+      allow get, update, delete: if isSignedIn() && isOwner(userId);
+      allow create: if isSignedIn() && isOwner(userId);
       allow list: if false;
-      allow create: if isOwner(userId);
-      allow update: if isOwner(userId);
-      allow delete: if isOwner(userId);
     }
 
     /**
-     * @description Controls access to student data.
+     * @description Secures student data.
      * @path /students/{studentId}
-     * @allow (get) Admin can read any student profile.
-     * @allow (get) Teacher can read students from their own class.
-     * @allow (create) Admin can create any student profile.
-     * @allow (update) Admin can update any student profile.
-     * @allow (delete) Admin can delete any student profile.
-     * @deny (get) Teacher cannot read students from other classes.
-     * @deny (create) Teacher cannot create student profiles.
-     * @deny (update) Teacher cannot update student profiles.
-     * @deny (delete) Teacher cannot delete student profiles.
-     * @principle Enforces role-based access control for student profiles.
+     * @allow (create) - If the user is a teacher and the student belongs to their class OR the user is an admin.
+     * @allow (get, list) - Public read access.
+     * @allow (update, delete) - If the user is an admin.
+     * @deny (update, delete) - If the user is a teacher. Teachers cannot modify or delete student records.
+     * @principle Admins can manage all students, teachers can only create students for their class.
      */
     match /students/{studentId} {
-      allow get: if isAdmin() || (isTeacher() && isTeacherForClass(resource.data.classId));
-      allow list: if isAdmin();
-      allow create: if isAdmin();
-      allow update: if isAdmin();
-      allow delete: if isAdmin();
+      allow get, list: if true;
+      allow create: if isSignedIn() && (isTeacher() && request.resource.data.classId in getTeacherClasses() || isAdmin());
+      allow update, delete: if isSignedIn() && isAdmin();
     }
 
     /**
-     * @description Controls access to incident data.
+     * @description Secures incident data.
      * @path /incidents/{incidentId}
-     * @allow (get) Admin can read any incident.
-     * @allow (get) Teacher can read incidents from their own class.
-     * @allow (create) Admin can create any incident.
-     * @allow (update) Admin can update any incident.
-     * @allow (delete) Admin can delete any incident.
-     * @deny (get) Teacher cannot read incidents from other classes.
-     * @deny (create) Teacher cannot create incidents.
-     * @deny (update) Teacher cannot update incidents.
-     * @deny (delete) Teacher cannot delete incidents.
-     * @principle Enforces role-based access control for incident reports.
+     * @allow (create) - If the user is a teacher and the incident belongs to their class OR the user is an admin.
+     * @allow (get, list) - Public read access.
+     * @allow (update, delete) - If the user is an admin.
+     * @deny (update, delete) - If the user is a teacher. Teachers cannot modify or delete incident records.
+     * @principle Admins can manage all incidents, teachers can only create incidents for their class.
      */
     match /incidents/{incidentId} {
-      allow get: if isAdmin() || (isTeacher() && isTeacherForClass(resource.data.classId));
-      allow list: if isAdmin();
-      allow create: if isAdmin();
-      allow update: if isAdmin();
-      allow delete: if isAdmin();
+      allow get, list: if true;
+      allow create: if isSignedIn() && (isTeacher() && request.resource.data.classId in getTeacherClasses() || isAdmin());
+      allow update, delete: if isSignedIn() && isAdmin();
     }
 
     /**
-     * @description Controls access to AI-generated summaries.
+     * @description Secures AI-generated summary data.
      * @path /summaries/{summaryId}
-     * @allow (get) Admin can read any summary.
-     * @allow (get) Teacher can read summaries for students in their own class.
-     * @allow (create) Only the backend AI function can create summaries.
-     * @allow (update) Admin can update any summary.
-     * @allow (delete) Admin can delete any summary.
-     * @deny (create) Teacher cannot create summaries.
-     * @deny (update) Teacher cannot update summaries.
-     * @deny (delete) Teacher cannot delete summaries.
-     * @principle Enforces role-based access control for summaries and restricts creation to the backend AI function.
+     * @allow (create) - If the user is an admin.
+     * @allow (get, list) - Public read access.
+     * @allow (update, delete) - If the user is an admin.
+     * @deny (create, update, delete) - If the user is a teacher. Teachers cannot create, update or delete summary records.
+     * @principle Admins can manage all summaries.
      */
     match /summaries/{summaryId} {
-      allow get: if isAdmin() || (isTeacher() && isTeacherForClass(resource.data.classId));
-      allow list: if isAdmin();
-      allow create: if isAIDevice();
-      allow update: if isAdmin();
-      allow delete: if isAdmin();
+      allow get, list: if true;
+      allow create, update, delete: if isSignedIn() && isAdmin();
     }
-  }
 
-  // Helper functions
-  function isSignedIn() {
-    return request.auth != null;
-  }
+    /**
+     * @description Secures student data within a class context.
+     * @path /classes/{classId}/students/{studentId}
+     * @allow (create) - If the user is a teacher and the classId is in the teacher's classes.
+     * @deny (get, list, update, delete) - No other operations allowed.
+     * @principle Teachers can create students within their assigned classes.
+     */
+    match /classes/{classId}/students/{studentId} {
+      allow create: if isSignedIn() && isTeacher() && classId in getTeacherClasses();
+      allow get, list, update, delete: if false;
+    }
 
-  function isOwner(userId) {
-    return isSignedIn() && request.auth.uid == userId;
-  }
+    function isSignedIn() {
+      return request.auth != null;
+    }
 
-  function isExistingOwner(userId) {
-    return isSignedIn() && request.auth.uid == userId;
-  }
+    function isOwner(userId) {
+      return request.auth.uid == userId;
+    }
 
-  function isAdmin() {
-    return isSignedIn() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
-  }
+    function isAdmin() {
+      return isSignedIn() && getRole() == 'admin';
+    }
 
-  function isTeacher() {
-    return isSignedIn() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'teacher';
-  }
+    function isTeacher() {
+      return isSignedIn() && getRole() == 'teacher';
+    }
 
-  function isTeacherForClass(classId) {
-    return isSignedIn() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.classId == classId;
-  }
+    function getRole() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role;
+    }
 
-  function isAIDevice() {
-    // Replace with your AI backend's authentication logic. This is a placeholder.
-    return request.auth != null && request.auth.uid == 'ai-backend-service-account';
+    function getTeacherClasses() {
+      return [get(/databases/$(database)/documents/users/$(request.auth.uid)).data.classId];
+    }
   }
 }

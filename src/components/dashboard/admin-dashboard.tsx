@@ -73,17 +73,16 @@ export function AdminDashboard() {
             <p className="text-xs text-muted-foreground">across all classes</p>
           </CardContent>
         </Card>
-        <Card className="flex flex-col">
-          <CardHeader className="flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Teacher Management</CardTitle>
-            <Users className="h-4 w-4 text-muted-foreground" />
+         <Card className="flex flex-col">
+          <CardHeader className="pb-2">
+             <CardTitle className="text-sm font-medium">Student Management</CardTitle>
           </CardHeader>
           <CardContent className="flex-1">
-             <CardDescription>Onboard new teachers and manage existing staff.</CardDescription>
+             <CardDescription>View all students or add a new student to the roster.</CardDescription>
           </CardContent>
           <CardFooter>
             <Button asChild className='w-full'>
-              <Link href="/manage-teachers">Manage Teachers</Link>
+              <Link href="/manage-students">Manage Students</Link>
             </Button>
           </CardFooter>
         </Card>
