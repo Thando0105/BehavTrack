@@ -32,6 +32,7 @@ export function AddTeacherForm() {
   });
 
   const onSubmit = (data: AddTeacherFormValues) => {
+    if (!firestore) return;
     // We can't create a user with password from the client-side for security reasons.
     // Instead, we'll create a user profile. The teacher will need to sign up with this email.
     const userDocRef = doc(firestore, 'users', data.email); // Use email as temporary ID

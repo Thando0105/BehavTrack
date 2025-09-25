@@ -36,13 +36,15 @@ export function StudentDetails({ student }: StudentDetailsProps) {
   
   // Real-time incidents
   const incidentsQuery = useMemoFirebase(() => {
-    if (!firestore || !student.id || !userData) return null;
+    if (!firestore || !student.id || !userData || !user) return null;
     
     let q = query(collection(firestore, 'incidents'), where('studentId', '==', student.id));
 
+    // If the user is a teacher, they can only see incidents they created.
     if (userData.role === 'teacher') {
-      q = query(q, where('teacherId', '==', user?.uid));
+      q = query(q, where('teacherId', '==', user.uid));
     }
+    // Admins can see all incidents for the student, so no extra filter is needed.
     
     return q;
   }, [firestore, student.id, userData, user]);
