@@ -36,7 +36,7 @@ export function AppSidebar() {
 
   const role = userData?.role;
 
-  const menuItems = [
+  const menuItems = useMemo(() => [
     { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { href: '/students', label: 'Students', icon: Users, adminOnly: true },
     { href: '/manage-teachers', label: 'Teachers', icon: Briefcase, adminOnly: true },
@@ -48,7 +48,7 @@ export function AppSidebar() {
       }
       return true;
     }
-  );
+  ), [role]);
 
    const handleSignOut = async () => {
     await signOut(auth);

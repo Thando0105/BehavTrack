@@ -17,14 +17,18 @@ export function AdminDashboard() {
   const { data: userData } = useDoc<User>(userRef);
 
   const incidentsQuery = useMemoFirebase(() => {
-    if (!firestore || userData?.role !== 'admin') return null;
-    return query(collection(firestore, 'incidents'));
+    if (firestore && userData?.role === 'admin') {
+        return query(collection(firestore, 'incidents'));
+    }
+    return null;
   }, [firestore, userData]);
   const { data: incidents, isLoading: areIncidentsLoading } = useCollection<IncidentData>(incidentsQuery);
 
   const studentsQuery = useMemoFirebase(() => {
-     if (!firestore || userData?.role !== 'admin') return null;
-    return query(collection(firestore, 'students'));
+    if (firestore && userData?.role === 'admin') {
+        return query(collection(firestore, 'students'));
+    }
+    return null;
   }, [firestore, userData]);
   const { data: students, isLoading: areStudentsLoading } = useCollection<StudentData>(studentsQuery);
 
