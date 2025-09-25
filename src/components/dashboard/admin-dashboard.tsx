@@ -1,3 +1,4 @@
+
 import { Activity, AlertTriangle, UserCheck, Users } from 'lucide-react';
 import Link from 'next/link';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
@@ -5,16 +6,15 @@ import { IncidentCharts } from './incident-charts';
 import { Button } from '../ui/button';
 import { useFirebase, useCollection, useMemoFirebase } from '@/firebase';
 import { collection, query } from 'firebase/firestore';
-import type { Incident as IncidentData, Student as StudentData } from '@/lib/types';
+import type { Incident as IncidentData, Student as StudentData, User as UserData } from '@/lib/types';
 import { useDoc } from '@/firebase';
 import { doc } from 'firebase/firestore';
-import type { User } from '@/lib/types';
 
 export function AdminDashboard() {
   const { firestore, user } = useFirebase();
 
   const userRef = useMemoFirebase(() => (user ? doc(firestore, 'users', user.uid) : null), [firestore, user]);
-  const { data: userData } = useDoc<User>(userRef);
+  const { data: userData } = useDoc<UserData>(userRef);
 
   const incidentsQuery = useMemoFirebase(() => {
     if (firestore && userData?.role === 'admin') {

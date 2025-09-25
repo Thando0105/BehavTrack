@@ -1,3 +1,4 @@
+
 'use client';
 
 import { AppHeader } from '@/components/app-header';
@@ -18,14 +19,14 @@ export default function StudentsPage() {
 
   const studentsQuery = useMemoFirebase(
     () => {
-      // Only construct the query if firestore is ready and the user is confirmed to be an admin.
-      if (firestore && userData?.role === 'admin') {
+      // Only construct the query if firestore is ready and the user data is loaded and confirms the user is an admin.
+      if (firestore && userData && userData.role === 'admin') {
         return collection(firestore, 'students');
       }
       // For any other case (loading, not an admin, etc.), return null to prevent the query.
       return null;
     },
-    [firestore, userData?.role] // Dependency is now on the role itself.
+    [firestore, userData] // Dependency is on the loaded userData object.
   );
   const { data: students, isLoading: areStudentsLoading } = useCollection<Student>(studentsQuery);
 
