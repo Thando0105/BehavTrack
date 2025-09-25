@@ -9,7 +9,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import type { Incident, Student } from '@/lib/types';
+import type { Incident, Student, User } from '@/lib/types';
 import { IncidentLog } from './incident-log';
 import { LogIncidentDialog } from './log-incident-dialog';
 import type { GenerateWeeklyBehaviorSummaryOutput } from '@/ai/flows/generate-weekly-behavior-summary';
@@ -30,12 +30,22 @@ export function StudentDetails({ student }: StudentDetailsProps) {
 
   const [summary, setSummary] = useState<GenerateWeeklyBehaviorSummaryOutput | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+
+  const userRef = useMemoFirebase(() => (user ? doc(firestore, 'users', user.uid) : null), [firestore, user]);
+  const { data: userData } = useDoc<User>(userRef);
   
   // Real-time incidents
   const incidentsQuery = useMemoFirebase(() => {
-    if (!firestore || !student.id) return null;
-    return query(collection(firestore, 'incidents'), where('studentId', '==', student.id));
-  }, [firestore, student.id]);
+    if (!firestore || !student.id || !userData) return null;
+    
+    let q = query(collection(firestore, 'incidents'), where('studentId', '==', student.id));
+
+    if (userData.role === 'teacher') {
+      q = query(q, where('teacherId', '==', user?.uid));
+    }
+    
+    return q;
+  }, [firestore, student.id, userData, user]);
 
   const { data: incidents, isLoading: areIncidentsLoading } = useCollection<Incident>(incidentsQuery);
   const sortedIncidents = useMemo(() => 
@@ -70,6 +80,9 @@ export function StudentDetails({ student }: StudentDetailsProps) {
     // This function is now a no-op because the useCollection hook will automatically update the UI.
   };
 
+  const canLogIncident = userData?.role === 'teacher';
+
+
   return (
     <>
       <LogIncidentDialog
@@ -103,9 +116,11 @@ export function StudentDetails({ student }: StudentDetailsProps) {
                 </div>
               </CardHeader>
               <CardContent className="flex gap-2">
-                <Button className="w-full" onClick={() => setIsDialogOpen(true)}>
-                  <PlusCircle className="mr-2 h-4 w-4" /> Log Incident
-                </Button>
+                {canLogIncident && (
+                  <Button className="w-full" onClick={() => setIsDialogOpen(true)}>
+                    <PlusCircle className="mr-2 h-4 w-4" /> Log Incident
+                  </Button>
+                )}
                 <Button
                   variant="outline"
                   className="w-full"

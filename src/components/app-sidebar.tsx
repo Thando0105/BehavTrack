@@ -42,7 +42,13 @@ export function AppSidebar() {
     { href: '/manage-teachers', label: 'Teachers', icon: Briefcase, adminOnly: true },
     { href: '/reports', label: 'Reports', icon: BarChart3, adminOnly: true },
     { href: '/settings', label: 'Settings', icon: Settings },
-  ].filter(item => !(item.adminOnly && role !== 'admin'));
+  ].filter(item => {
+      if (item.adminOnly) {
+        return role === 'admin';
+      }
+      return true;
+    }
+  );
 
    const handleSignOut = async () => {
     await signOut(auth);
@@ -63,7 +69,7 @@ export function AppSidebar() {
             <SidebarMenuItem key={item.label}>
               <SidebarMenuButton
                 asChild
-                isActive={pathname === item.href}
+                isActive={pathname.startsWith(item.href)}
               >
                 <Link href={item.href}>
                   <item.icon className="h-5 w-5" />

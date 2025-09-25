@@ -1,21 +1,31 @@
 import { Activity, AlertTriangle, UserCheck, Users } from 'lucide-react';
 import Link from 'next/link';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
-import { incidents, students } from '@/lib/data';
 import { IncidentCharts } from './incident-charts';
 import { Button } from '../ui/button';
 import { useFirebase, useCollection, useMemoFirebase } from '@/firebase';
 import { collection, query } from 'firebase/firestore';
 import type { Incident as IncidentData, Student as StudentData } from '@/lib/types';
-
+import { useDoc } from '@/firebase';
+import { doc } from 'firebase/firestore';
+import type { User } from '@/lib/types';
 
 export function AdminDashboard() {
-  const { firestore } = useFirebase();
+  const { firestore, user } = useFirebase();
 
-  const incidentsQuery = useMemoFirebase(() => query(collection(firestore, 'incidents')), [firestore]);
+  const userRef = useMemoFirebase(() => (user ? doc(firestore, 'users', user.uid) : null), [firestore, user]);
+  const { data: userData } = useDoc<User>(userRef);
+
+  const incidentsQuery = useMemoFirebase(() => {
+    if (!firestore || userData?.role !== 'admin') return null;
+    return query(collection(firestore, 'incidents'));
+  }, [firestore, userData]);
   const { data: incidents, isLoading: areIncidentsLoading } = useCollection<IncidentData>(incidentsQuery);
 
-  const studentsQuery = useMemoFirebase(() => query(collection(firestore, 'students')), [firestore]);
+  const studentsQuery = useMemoFirebase(() => {
+     if (!firestore || userData?.role !== 'admin') return null;
+    return query(collection(firestore, 'students'));
+  }, [firestore, userData]);
   const { data: students, isLoading: areStudentsLoading } = useCollection<StudentData>(studentsQuery);
 
 
