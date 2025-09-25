@@ -4,59 +4,67 @@ service cloud.firestore {
 
     // Users collection
     match /users/{userId} {
-      // Allow user to read/write their own doc, OR an admin to write to any user doc.
-      allow read: if request.auth != null && request.auth.uid == userId;
-      allow write: if (request.auth != null && request.auth.uid == userId) || isAdmin();
+      // Admins can read/write all users (for teacher management)
+      allow get, list, read, write: if isAdmin();
+
+      // Each user can read/write their own record
+      allow get, read, write: if request.auth != null && request.auth.uid == userId;
     }
 
-    // Students collection
+    // Students collection (as a root collection)
     match /students/{studentId} {
       // Admins can read/list/write all students
       allow get, list, read, write: if isAdmin();
-
-      // Teachers: only see students in their class
-      allow get, list, read: if isTeacher() &&
-        resource.data.classId in getTeacherClasses();
     }
     
+    // Classes collection with nested students
+    match /classes/{classId} {
+      // Admins can manage all classes
+      allow get, list, read, write: if isAdmin();
+
+      // Teachers can read their own class document
+      allow get, read: if isTeacher() && classId == getUserData().classId;
+      
+      match /students/{studentId} {
+        // Admins can manage all students in any class
+        allow get, list, read, write: if isAdmin();
+
+        // Teachers can read students in their assigned class
+        allow get, list, read: if isTeacher() && classId == getUserData().classId;
+      }
+    }
+
     // Incidents collection
     match /incidents/{incidentId} {
       // Admin full access
-      allow get, list, read, write: if isAdmin();
+      allow read, write: if isAdmin();
 
-      // Teachers: can create incidents, and can only read/list incidents for their own class.
-      allow create: if isTeacher();
-      allow get, list, read: if isTeacher() && get(/databases/$(database)/documents/incidents/$(incidentId)).data.teacherId == request.auth.uid;
+      // Teachers can create incidents for students in their class
+      // and can read incidents they have created.
+      allow create: if isTeacher() && request.resource.data.teacherId == request.auth.uid;
+      allow read: if isTeacher() && resource.data.teacherId == request.auth.uid;
     }
-    
+
     // Summaries collection
     match /summaries/{summaryId} {
-      allow get, list, read, write: if isAdmin();
-      allow get, list, read: if isTeacher() && resource.data.classId in getTeacherClasses();
-    }
-
-    // Classes collection
-    match /classes/{classId} {
+      // Admins have full access
       allow read, write: if isAdmin();
-      allow read: if isTeacher() && classId == get(/databases/$(database)/documents/users/$(request.auth.uid)).data.classId;
+
+      // Teachers can read summaries for students in their class
+      allow read: if isTeacher() && resource.data.classId == getUserData().classId;
     }
 
-    match /classes/{classId}/students/{studentId} {
-       allow read, write: if isAdmin();
-       allow read: if isTeacher() && classId == get(/databases/$(database)/documents/users/$(request.auth.uid)).data.classId;
-    }
-
-    // Utility functions
+    // --- Helper Functions ---
     function isAdmin() {
-      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == "admin";
+      return getUserData().role == "admin";
     }
 
     function isTeacher() {
-      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == "teacher";
+      return getUserData().role == "teacher";
     }
-
-    function getTeacherClasses() {
-      return [get(/databases/$(database)/documents/users/$(request.auth.uid)).data.classId];
+    
+    function getUserData() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
     }
   }
 }
