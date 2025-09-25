@@ -18,13 +18,14 @@ export default function StudentsPage() {
 
   const studentsQuery = useMemoFirebase(
     () => {
-      // Only construct the query if the user is an admin
+      // Only construct the query if firestore is ready and the user is confirmed to be an admin.
       if (firestore && userData?.role === 'admin') {
-        return query(collection(firestore, 'students'));
+        return collection(firestore, 'students');
       }
-      return null; // Return null if not an admin or if firestore is not ready
+      // For any other case (loading, not an admin, etc.), return null to prevent the query.
+      return null;
     },
-    [firestore, userData]
+    [firestore, userData?.role] // Dependency is now on the role itself.
   );
   const { data: students, isLoading: areStudentsLoading } = useCollection<Student>(studentsQuery);
 
@@ -36,6 +37,7 @@ export default function StudentsPage() {
     return redirect('/login');
   }
 
+  // This check is important as it prevents rendering anything further for non-admins.
   if (userData?.role !== 'admin') {
     return (
       <main className="flex flex-1 flex-col gap-4 p-4 md:gap-8 md:p-6">
@@ -51,7 +53,7 @@ export default function StudentsPage() {
     <main className="flex flex-1 flex-col gap-4 p-4 md:gap-8 md:p-6">
       <AppHeader title="All Students" />
       <div className="grid gap-6">
-        {areStudentsLoading && !students ? (
+        {areStudentsLoading ? (
           <p>Loading students...</p>
         ) : (
           <StudentRoster students={students || []} />
