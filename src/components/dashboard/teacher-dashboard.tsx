@@ -18,7 +18,8 @@ export function TeacherDashboard() {
 
   const studentsQuery = useMemoFirebase(() => {
     if (!firestore || !userData?.classId) return null;
-    return query(collection(firestore, 'students'), where('classId', '==', userData.classId));
+    // Correctly query the subcollection of students within a class
+    return collection(firestore, 'classes', userData.classId, 'students');
   }, [firestore, userData?.classId]);
 
   const { data: students, isLoading } = useCollection<Student>(studentsQuery);
