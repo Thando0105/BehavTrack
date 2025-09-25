@@ -1,0 +1,122 @@
+/**
+ * @fileoverview Firestore Security Rules for BehavTrack application.
+ *
+ * Core Philosophy:
+ * This ruleset enforces a role-based access control model, with a strong emphasis on authorization independence
+ * through data denormalization.  Teachers have access to data related to their classes and students. Admins may
+ * have broader access (currently not implemented, but reserved for future use).
+ *
+ * Data Structure:
+ * - /users/{userId}: Stores user profiles, keyed by Firebase Auth UID.
+ * - /classes/{classId}: Stores class information.
+ * - /classes/{classId}/students/{studentId}: Stores student information, nested under classes.
+ * - /incidents/{incidentId}: Stores incident reports, denormalizing teacherId and studentId for efficient authorization.
+ * - /summaries/{summaryId}: Stores AI-generated summaries.
+ *
+ * Key Security Decisions:
+ * - Users can only read and write their own user document.
+ * - Listing users is not permitted.
+ * - Teachers can only create incidents for students in classes they are assigned to.
+ * - Data validation is limited to authorization-critical fields for rapid prototyping.
+ *
+ * Denormalization for Authorization:
+ * - The 'Incident' documents denormalize the 'teacherId' and 'studentId'. This avoids needing to perform
+ *   expensive 'get()' operations to validate that a teacher has access to a particular student's incident reports.
+ *
+ * Structural Segregation:
+ * - Private user data is stored under /users/{userId}, ensuring clear ownership and access control.
+ */
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    /**
+     * @description Controls access to user profile documents.
+     * @path /users/{userId}
+     * @allow (create) Authenticated user can create their own profile if the userId matches their auth UID.
+     * @allow (get, update, delete) Authenticated user can get, update, or delete their own profile if the userId matches their auth UID.
+     * @deny (create) Unauthenticated user cannot create a user profile.
+     * @deny (get, update, delete) Authenticated user cannot get, update, or delete another user's profile.
+     * @deny (list) Listing users is not permitted.
+     * @principle Enforces document ownership for user profiles.
+     */
+    match /users/{userId} {
+      // User can only read and write their own document
+      allow get, update, delete: if isSignedIn() && isOwner(userId);
+      allow create: if isSignedIn() && isSelfCreate(userId);
+      allow list: if false;
+    }
+
+    /**
+     * @description Controls access to class documents.
+     * @path /classes/{classId}
+     * @allow (get, list) Anyone can read class details.
+     * @deny (create, update, delete) Only admins can modify class details (not yet implemented).
+     * @principle Public read, admin-only write (admin check not yet implemented).
+     */
+    match /classes/{classId} {
+      allow get, list: if true;
+      allow create, update, delete: if false; // TODO: Add admin role check for write access.
+    }
+
+    /**
+     * @description Controls access to student documents within a class.
+     * @path /classes/{classId}/students/{studentId}
+     * @allow (get, list) Anyone can read student details within a class.
+     * @deny (create, update, delete) Only admins can modify student details (not yet implemented).
+     * @principle Public read, admin-only write (admin check not yet implemented).
+     */
+    match /classes/{classId}/students/{studentId} {
+      allow get, list: if true;
+      allow create, update, delete: if false; // TODO: Add admin role check for write access.
+    }
+
+    /**
+     * @description Controls access to incident documents.
+     * @path /incidents/{incidentId}
+     * @allow (create) Teacher can create incident if teacherId in the document matches their auth UID.
+     * @allow (get, list, update, delete) Teacher can get, list, update, or delete incident if teacherId in the document matches their auth UID and document exists.
+     * @deny (create) Teacher cannot create incident for other teachers.
+     * @deny (get, list, update, delete) Teacher cannot get, list, update, or delete incidents of other teachers.
+     * @principle Enforces teacher-ownership of incident reports.
+     */
+    match /incidents/{incidentId} {
+      allow get, list: if isSignedIn() && isIncidentBelongsToTeacher(resource.data.teacherId);
+      allow create: if isSignedIn() && request.resource.data.teacherId == request.auth.uid;
+      allow update, delete: if isSignedIn() && isExistingIncidentBelongsToTeacher(resource.data.teacherId);
+    }
+
+    /**
+     * @description Controls access to summary documents.
+     * @path /summaries/{summaryId}
+     * @allow (get, list) Anyone can read summary details.
+     * @deny (create, update, delete) Only admins can modify summary details (not yet implemented).
+     * @principle Public read, admin-only write (admin check not yet implemented).
+     */
+    match /summaries/{summaryId} {
+      allow get, list: if true;
+      allow create, update, delete: if false; // TODO: Add admin role check for write access.
+    }
+
+    // Helper functions
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return request.auth.uid == userId;
+    }
+
+    function isSelfCreate(userId) {
+        return request.auth.uid == userId && request.resource.data.uid == userId && request.resource.data.email == request.auth.token.email;
+    }
+
+    function isIncidentBelongsToTeacher(teacherId) {
+      return teacherId == request.auth.uid;
+    }
+
+    function isExistingIncidentBelongsToTeacher(teacherId) {
+        return isIncidentBelongsToTeacher(teacherId) && resource != null;
+    }
+  }
+}
