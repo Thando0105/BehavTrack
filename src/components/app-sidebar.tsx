@@ -1,5 +1,5 @@
 'use client';
-import { School, LayoutDashboard, Users, BarChart3, Settings, LogOut, Briefcase } from 'lucide-react';
+import { School, LayoutDashboard, Users, BarChart3, Settings, LogOut, Briefcase, UserPlus } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useFirebase, useDoc, useMemoFirebase } from '@/firebase';
@@ -38,8 +38,9 @@ export function AppSidebar() {
 
   const menuItems = useMemo(() => [
     { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-    { href: '/students', label: 'Students', icon: Users, adminOnly: true },
-    { href: '/manage-teachers', label: 'Teachers', icon: Briefcase, adminOnly: true },
+    { href: '/students', label: 'All Students', icon: Users, adminOnly: true },
+    { href: '/manage-students', label: 'Manage Students', icon: UserPlus, adminOnly: true },
+    { href: '/manage-teachers', label: 'Manage Teachers', icon: Briefcase, adminOnly: true },
     { href: '/reports', label: 'Reports', icon: BarChart3, adminOnly: true },
     { href: '/settings', label: 'Settings', icon: Settings },
   ].filter(item => {
