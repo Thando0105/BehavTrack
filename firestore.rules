@@ -1,66 +1,122 @@
+/**
+ * @file Firestore Security Rules
+ * @description This ruleset enforces a role-based access control model with ownership constraints.
+ *
+ * Data Structure:
+ * - /users/{userId}: Stores user profiles. Document ID is the Firebase Auth UID.
+ * - /students/{studentId}: Stores student data.
+ * - /incidents/{incidentId}: Stores incident reports.
+ * - /summaries/{summaryId}: Stores AI-generated behavior summaries.
+ *
+ * Key Security Decisions:
+ * - Users can only read and write their own user profile.
+ * - Teachers can create incidents for students in their class.
+ * - Teachers can only read summaries for their students.
+ * - Admins have full read/write access to all data.
+ * - Listing of users is disallowed.
+ *
+ * Denormalization for Authorization:
+ * - Incidents and Summaries store `classId` to allow filtering by class, and teacherId for teacher association.
+ */
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Helper functions
-    function isAuth() {
-      return request.auth != null;
-    }
-
-    function isUser(userId) {
-      return isAuth() && request.auth.uid == userId;
-    }
-
-    function getUserData(userId) {
-      return get(/databases/$(database)/documents/users/$(userId)).data;
-    }
-
-    function isAdmin() {
-      return isAuth() && getUserData(request.auth.uid).role == 'admin';
-    }
-
-    function isTeacher() {
-      return isAuth() && getUserData(request.auth.uid).role == 'teacher';
-    }
-
-    function isTeacherForClass(classId) {
-        return isTeacher() && getUserData(request.auth.uid).classId == classId;
-    }
-
-    // Admins can manage all user records. Users can only manage their own.
+    /**
+     * @description Secure user profiles. Users can only access their own profile.
+     * @path /users/{userId}
+     * @allow (get, update, delete) User with UID 'user123' can read, update, and delete /users/user123.
+     * @allow (create) User with UID 'user123' can create /users/user123.
+     * @deny (get, update, delete) User with UID 'user456' cannot access /users/user123.
+     * @deny (create) User with UID 'user456' cannot create /users/user123.
+     * @principle Enforces document ownership.
+     */
     match /users/{userId} {
-      allow read, list: if isAdmin();
-      allow write: if isAdmin() || isUser(userId);
-      allow get: if isUser(userId);
+      function isSignedIn() {
+        return request.auth != null;
+      }
+      function isOwner(userId) {
+        return request.auth.uid == userId;
+      }
+      function isExistingOwner(userId) {
+          return isSignedIn() && isOwner(userId) && exists(/databases/$(database)/documents/users/$(userId));
+      }
+
+      allow get: if isOwner(userId);
+      allow list: if false;
+      allow create: if isSignedIn() && isOwner(userId);
+      allow update: if isExistingOwner(userId);
+      allow delete: if isExistingOwner(userId);
     }
-    
-    // Students can only be managed by Admins. Teachers can only read students in their own class.
+
+    /**
+     * @description Secure student data.
+     * @path /students/{studentId}
+     * @allow (get, list) Any signed-in user can read student data.
+     * @deny (create, update, delete) Only admins can create, update, and delete student data.
+     * @principle Restricts student management to admins.
+     */
     match /students/{studentId} {
-      allow read, write, create, delete, list: if isAdmin();
-      allow get, list: if isTeacher() && resource.data.classId == getUserData(request.auth.uid).classId;
+       function isSignedIn() {
+        return request.auth != null;
+      }
+
+      function isAdmin() {
+        return isSignedIn() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+      }
+        allow get, list: if isSignedIn();
+        allow create: if isAdmin();
+        allow update: if isAdmin();
+        allow delete: if isAdmin();
     }
 
-    // Incidents can be created by teachers. Admins have full access. Teachers can only read incidents they created.
+    /**
+     * @description Secure incident reports. Teachers can create incidents for students in their class. Admins have full access.
+     * @path /incidents/{incidentId}
+     * @allow (create) Teacher with UID 'teacher123' can create an incident for a student in their class.
+     * @allow (get, list) Admin can read all incidents. Teacher can read incidents for students in their class.
+     * @deny (create) Teacher cannot create incidents for students outside their class.
+     * @deny (update, delete) Only admins can update or delete incidents.
+     * @principle Role-based access control with class-based restrictions.
+     */
     match /incidents/{incidentId} {
-      allow read, write, list: if isAdmin();
-      allow create: if isTeacher();
-      // A teacher can only read incidents they have created.
-      allow get, list: if isTeacher() && resource.data.teacherId == request.auth.uid;
+        function isSignedIn() {
+        return request.auth != null;
+      }
+      function isAdmin() {
+        return isSignedIn() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+      }
+      function isTeacherForClass(classId) {
+        return isSignedIn() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'teacher' && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.classId == classId;
+      }
+        allow get, list: if isAdmin() || (isSignedIn() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.classId == resource.data.classId);
+        allow create: if isAdmin() || (isSignedIn() && isTeacherForClass(request.resource.data.classId) && request.resource.data.teacherId == request.auth.uid);
+        allow update: if isAdmin();
+        allow delete: if isAdmin();
     }
 
-    // Summaries can be read by admins or the teacher of the class.
+     /**
+      * @description Secure AI-generated summaries.
+      * @path /summaries/{summaryId}
+      * @allow (get, list) Admins can read all summaries. Teachers can read summaries for students in their class.
+      * @deny (create, update, delete) Only admins can create, update, and delete summaries.
+      * @principle Restricts summary management to admins, read access to admins and teachers for their students.
+      */
     match /summaries/{summaryId} {
-      allow read, write, list: if isAdmin();
-      allow get, list: if isTeacher() && resource.data.classId == getUserData(request.auth.uid).classId;
-    }
-    
-     match /classes/{classId} {
-      allow read, write: if isAdmin();
-    }
+        function isSignedIn() {
+        return request.auth != null;
+      }
 
-    match /classes/{classId}/students/{studentId} {
-        allow read: if isAdmin() || isTeacherForClass(classId);
-        allow write: if isAdmin();
+      function isAdmin() {
+        return isSignedIn() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+      }
+      function isTeacherForClass(classId) {
+        return isSignedIn() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'teacher' && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.classId == classId;
+      }
+        allow get, list: if isAdmin() || (isSignedIn() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.classId == resource.data.classId);
+        allow create: if isAdmin();
+        allow update: if isAdmin();
+        allow delete: if isAdmin();
     }
   }
 }

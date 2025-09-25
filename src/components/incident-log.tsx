@@ -6,6 +6,7 @@ import { format } from 'date-fns';
 
 interface IncidentLogProps {
   incidents: Incident[];
+  isLoading: boolean;
 }
 
 const severityStyles: Record<IncidentSeverity, string> = {
@@ -14,7 +15,7 @@ const severityStyles: Record<IncidentSeverity, string> = {
   high: 'bg-red-100 text-red-800 border-red-200 dark:bg-red-900/50 dark:text-red-300 dark:border-red-800',
 };
 
-export function IncidentLog({ incidents }: IncidentLogProps) {
+export function IncidentLog({ incidents, isLoading }: IncidentLogProps) {
   return (
     <Card>
       <CardHeader>
@@ -22,20 +23,24 @@ export function IncidentLog({ incidents }: IncidentLogProps) {
         <CardDescription>A chronological log of all recorded incidents.</CardDescription>
       </CardHeader>
       <CardContent>
-        {incidents.length > 0 ? (
+        {isLoading ? (
+            <div className="text-center text-muted-foreground py-8">
+                <p>Loading incidents...</p>
+            </div>
+        ) : incidents.length > 0 ? (
           <ul className="space-y-4">
             {incidents.map(incident => (
               <li key={incident.id} className="flex gap-4">
-                <div className="flex-shrink-0">
+                <div className="flex-shrink-0 text-right">
                     <div className="text-sm font-medium">{format(new Date(incident.dateTime), 'MMM d')}</div>
                     <div className="text-xs text-muted-foreground">{format(new Date(incident.dateTime), 'h:mm a')}</div>
                 </div>
-                <div className="relative w-full">
-                    <div className="absolute left-[-24px] top-[4px] h-full border-l-2 border-border border-dashed"></div>
-                    <div className="absolute left-[-28px] top-[4px] h-4 w-4 rounded-full bg-primary/20 border-4 border-background"></div>
-                    <div className="flex items-start justify-between">
-                        <p className="text-sm text-foreground">{incident.description}</p>
-                        <Badge variant="outline" className={cn('capitalize', severityStyles[incident.severity])}>
+                <div className="relative w-full pl-4">
+                    <div className="absolute left-[-5px] top-[4px] h-full border-l-2 border-border border-dashed"></div>
+                    <div className="absolute left-[-9px] top-[4px] h-4 w-4 rounded-full bg-primary/20 border-4 border-background"></div>
+                    <div className="flex items-start justify-between gap-4">
+                        <p className="text-sm text-foreground flex-1">{incident.description}</p>
+                        <Badge variant="outline" className={cn('capitalize shrink-0', severityStyles[incident.severity])}>
                             {incident.severity}
                         </Badge>
                     </div>

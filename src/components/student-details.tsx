@@ -14,14 +14,11 @@ import type { Incident, Student, User } from '@/lib/types';
 import { IncidentLog } from './incident-log';
 import { LogIncidentDialog } from './log-incident-dialog';
 import type { GenerateWeeklyBehaviorSummaryOutput } from '@/ai/flows/generate-weekly-behavior-summary';
-import { AppHeader } from './app-header';
-import { useFirebase, useMemoFirebase } from '@/firebase';
+import { useFirebase, useMemoFirebase, useCollection, useDoc } from '@/firebase';
 import { collection, query, where, doc } from 'firebase/firestore';
-import { useCollection, useDoc } from '@/firebase';
 
 interface StudentDetailsProps {
   student: Student;
-  initialIncidents: Incident[]; // This will now be fed from the real-time hook
 }
 
 export function StudentDetails({ student }: StudentDetailsProps) {
@@ -35,33 +32,31 @@ export function StudentDetails({ student }: StudentDetailsProps) {
   const userRef = useMemoFirebase(() => (user ? doc(firestore, 'users', user.uid) : null), [firestore, user]);
   const { data: userData } = useDoc<User>(userRef);
   
-  // Real-time incidents
   const incidentsQuery = useMemoFirebase(() => {
-    if (!firestore || !student.id || !userData || !user) return null;
+    if (!firestore || !student.id || !user || !userData) return null;
     
-    // Admins can see all incidents for the student.
     if (userData.role === 'admin') {
       return query(collection(firestore, 'incidents'), where('studentId', '==', student.id));
     }
     
-    // If the user is a teacher, they can only see incidents they created for that student.
     if (userData.role === 'teacher') {
+      // Teachers should see all incidents for a student in their class, not just their own.
+      // The security rules will enforce they can only read from their class.
       return query(
         collection(firestore, 'incidents'), 
         where('studentId', '==', student.id),
-        where('teacherId', '==', user.uid)
+        where('classId', '==', student.classId)
       );
     }
     
-    return null; // Return null if user role is not determined
-  }, [firestore, student.id, userData, user]);
+    return null;
+  }, [firestore, student.id, student.classId, user, userData]);
 
   const { data: incidents, isLoading: areIncidentsLoading } = useCollection<Incident>(incidentsQuery);
   const sortedIncidents = useMemo(() => 
     (incidents || []).sort((a, b) => new Date(b.dateTime).getTime() - new Date(a.dateTime).getTime()),
     [incidents]
   );
-
 
   const handleGenerateSummary = () => {
     startTransition(async () => {
@@ -85,12 +80,7 @@ export function StudentDetails({ student }: StudentDetailsProps) {
     });
   };
 
-  const handleIncidentLogged = () => {
-    // This function is now a no-op because the useCollection hook will automatically update the UI.
-  };
-
   const canLogIncident = userData?.role === 'teacher';
-
 
   return (
     <>
@@ -98,12 +88,11 @@ export function StudentDetails({ student }: StudentDetailsProps) {
         student={student}
         open={isDialogOpen}
         onOpenChange={setIsDialogOpen}
-        onIncidentLogged={handleIncidentLogged}
       />
       <main className="flex flex-1 flex-col gap-4 p-4 md:gap-8 md:p-6">
         <div className="flex items-center gap-4">
           <Button variant="outline" size="icon" asChild>
-            <Link href="/dashboard">
+            <Link href={userData?.role === 'admin' ? '/manage-students' : '/dashboard'}>
               <ArrowLeft className="h-4 w-4" />
               <span className="sr-only">Back</span>
             </Link>
@@ -134,7 +123,7 @@ export function StudentDetails({ student }: StudentDetailsProps) {
                   variant="outline"
                   className="w-full"
                   onClick={handleGenerateSummary}
-                  disabled={isPending}
+                  disabled={isPending || sortedIncidents.length === 0}
                 >
                   {isPending ? (
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -169,7 +158,7 @@ export function StudentDetails({ student }: StudentDetailsProps) {
           </div>
 
           <div className="md:col-span-2">
-            {areIncidentsLoading ? <div>Loading incidents...</div> : <IncidentLog incidents={sortedIncidents} />}
+            <IncidentLog incidents={sortedIncidents} isLoading={areIncidentsLoading} />
           </div>
         </div>
       </main>

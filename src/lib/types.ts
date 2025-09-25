@@ -26,6 +26,7 @@ export interface Incident {
   id: string;
   studentId: string;
   teacherId: string;
+  classId: string;
   dateTime: string;
   severity: IncidentSeverity;
   description: string;
