@@ -14,9 +14,9 @@ import { IncidentLog } from './incident-log';
 import { LogIncidentDialog } from './log-incident-dialog';
 import type { GenerateWeeklyBehaviorSummaryOutput } from '@/ai/flows/generate-weekly-behavior-summary';
 import { AppHeader } from './app-header';
-import { useFirebase } from '@/firebase';
+import { useFirebase, useMemoFirebase } from '@/firebase';
 import { collection, query, where, doc } from 'firebase/firestore';
-import { useCollection, useDoc, useMemoFirebase } from '@/firebase/firestore/use-collection';
+import { useCollection, useDoc } from '@/firebase';
 
 interface StudentDetailsProps {
   student: Student;

@@ -2,9 +2,8 @@
 import { School, LayoutDashboard, Users, BarChart3, Settings, LogOut } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { useFirebase } from '@/firebase';
+import { useFirebase, useDoc, useMemoFirebase } from '@/firebase';
 import { doc } from 'firebase/firestore';
-import { useDoc } from '@/firebase/firestore/use-doc';
 import { useMemo } from 'react';
 import { signOut } from 'firebase/auth';
 import { useRouter } from 'next/navigation';
@@ -29,7 +28,7 @@ export function AppSidebar() {
   const { user, auth, firestore } = useFirebase();
   const router = useRouter();
 
-  const userRef = useMemo(
+  const userRef = useMemoFirebase(
     () => (user ? doc(firestore, 'users', user.uid) : null),
     [user, firestore]
   );
@@ -40,7 +39,7 @@ export function AppSidebar() {
 
   const menuItems = [
     { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-    { href: '/students', label: 'Students', icon: Users, disabled: true }, // Disabled until data is moved to Firestore
+    { href: '/students', label: 'Students', icon: Users, disabled: role !== 'admin' }, // Students link enabled for admins
     { href: '/reports', label: 'Reports', icon: BarChart3, adminOnly: true },
     { href: '/settings', label: 'Settings', icon: Settings },
   ].filter(item => !(item.adminOnly && role !== 'admin'));

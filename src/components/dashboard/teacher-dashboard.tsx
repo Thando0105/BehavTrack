@@ -1,23 +1,22 @@
 'use client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { StudentRoster } from '../student-roster';
-import { useFirebase } from '@/firebase';
+import { useFirebase, useCollection, useDoc, useMemoFirebase } from '@/firebase';
 import { useMemo } from 'react';
 import { collection, query, where } from 'firebase/firestore';
-import { useCollection, useDoc } from '@/firebase/firestore/use-doc';
 import type { Student, User } from '@/lib/types';
 import { doc } from 'firebase/firestore';
 
 export function TeacherDashboard() {
   const { firestore, user } = useFirebase();
 
-  const userRef = useMemo(
+  const userRef = useMemoFirebase(
     () => (user ? doc(firestore, 'users', user.uid) : null),
     [user, firestore]
   );
   const { data: userData } = useDoc<User>(userRef);
 
-  const studentsQuery = useMemo(() => {
+  const studentsQuery = useMemoFirebase(() => {
     if (!firestore || !userData?.classId) return null;
     return query(collection(firestore, 'students'), where('classId', '==', userData.classId));
   }, [firestore, userData?.classId]);
@@ -35,7 +34,7 @@ export function TeacherDashboard() {
       <CardContent>
         {isLoading && <div>Loading students...</div>}
         {students && <StudentRoster students={students} />}
-        {!isLoading && !students && <p>No students found for your class.</p>}
+        {!isLoading && !students?.length && <p>No students found for your class.</p>}
       </CardContent>
     </Card>
   );

@@ -1,12 +1,11 @@
 'use client';
 
 import { notFound, redirect } from 'next/navigation';
-import { incidents as mockIncidents, students as mockStudents } from '@/lib/data';
 import { StudentDetails } from '@/components/student-details';
-import { useFirebase } from '@/firebase';
+import { useFirebase, useMemoFirebase } from '@/firebase';
 import { useMemo } from 'react';
 import { doc, collection, query, where } from 'firebase/firestore';
-import { useDoc, useCollection } from '@/firebase/firestore/use-doc';
+import { useDoc, useCollection } from '@/firebase';
 import type { Student, Incident } from '@/lib/types';
 
 

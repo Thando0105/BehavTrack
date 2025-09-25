@@ -1,9 +1,8 @@
 'use client';
 
 import { useMemo } from 'react';
-import { useFirebase } from '@/firebase';
+import { useFirebase, useDoc, useMemoFirebase } from '@/firebase';
 import { doc } from 'firebase/firestore';
-import { useDoc } from '@/firebase/firestore/use-doc';
 import { AppHeader } from '@/components/app-header';
 import { AdminDashboard } from '@/components/dashboard/admin-dashboard';
 import { TeacherDashboard } from '@/components/dashboard/teacher-dashboard';
@@ -13,7 +12,7 @@ import { redirect } from 'next/navigation';
 export default function DashboardPage() {
   const { isUserLoading, user, firestore } = useFirebase();
 
-  const userRef = useMemo(
+  const userRef = useMemoFirebase(
     () => (user ? doc(firestore, 'users', user.uid) : null),
     [user, firestore]
   );

@@ -1,9 +1,8 @@
 'use client';
 
 import { Bell, LogOut, PanelLeft, Settings, User as UserIcon } from 'lucide-react';
-import { useFirebase } from '@/firebase';
+import { useFirebase, useDoc, useMemoFirebase } from '@/firebase';
 import { doc } from 'firebase/firestore';
-import { useDoc } from '@/firebase/firestore/use-doc';
 import { useMemo } from 'react';
 import { signOut } from 'firebase/auth';
 import { useRouter } from 'next/navigation';
@@ -31,7 +30,7 @@ export function AppHeader({ title }: AppHeaderProps) {
   const { user, auth, firestore } = useFirebase();
   const router = useRouter();
 
-  const userRef = useMemo(
+  const userRef = useMemoFirebase(
     () => (user ? doc(firestore, 'users', user.uid) : null),
     [user, firestore]
   );
