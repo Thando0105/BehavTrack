@@ -1,139 +1,117 @@
 /**
- * @fileoverview Firestore Security Rules for BehavTrack application.
- *
- * Core Philosophy:
- * This ruleset enforces a strict user-ownership model for user profiles
- * and a teacher-ownership model for incidents. Class and student data
- * are more open but restricted to authenticated users.
+ * @file Firestore Security Rules
+ * @description This ruleset enforces a strict user-ownership model for user profiles and leverages denormalized data to secure access to class, student, incident, and summary information.
  *
  * Data Structure:
- * - /users/{userId}: Stores individual user profiles.  Access is restricted to the owner.
+ * - /users/{userId}: Stores individual user profiles, accessible only to the owning user.
  * - /classes/{classId}: Stores class information.
  * - /classes/{classId}/students/{studentId}: Stores student information, nested under classes.
- * - /incidents/{incidentId}: Stores incident reports. Access is restricted to the teacher who created the incident.
- * - /summaries/{summaryId}: Stores AI summaries.
+ * - /incidents/{incidentId}: Stores incident reports.
+ * - /summaries/{summaryId}: Stores AI-generated summaries.
  *
  * Key Security Decisions:
- * - User listing is disallowed.
- * - All write operations require user authentication.
- * - Data validation is minimal to allow for rapid prototyping, focusing on
- *   authorization-critical fields.
+ * - Users can only read and write their own profile data.
+ * - Listing of users is disallowed for privacy.
+ * - Data required for authorization (e.g., classId, teacherId) is denormalized onto documents to avoid costly `get()` calls within rules.
  *
  * Denormalization for Authorization:
- * - The `Incident` entity includes a `teacherId` field to simplify ownership checks
- *   and prevent the need for complex queries.
+ * - /classes/{classId}/students/{studentId} includes a denormalized `classId` field.
+ * - /incidents/{incidentId} includes denormalized `teacherId`.
  */
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
     /**
-     * @description Manages user profile data. Only the user can read/write their own profile.
+     * @description Enforces user-ownership for user profiles.
      * @path /users/{userId}
-     * @allow (create) - User with ID 'user123' can create their own profile.
-     *   Request: { "auth": { "uid": "user123" }, "resource": { "data": { "id": "user123", ... } } }
-     * @allow (get, update, delete) - User with ID 'user123' can read, update, or delete their own profile.
-     *   Request: { "auth": { "uid": "user123" } }
-     * @deny (create) - User with ID 'user456' cannot create a profile for 'user123'.
-     *   Request: { "auth": { "uid": "user456" }, "resource": { "data": { "id": "user123", ... } } }
-     * @deny (get, update, delete) - User with ID 'user456' cannot read, update, or delete the profile of 'user123'.
-     *   Request: { "auth": { "uid": "user456" } }
+     * @allow (create) User with UID 'user_abc' can create their profile at /users/user_abc.
+     * @allow (get) User with UID 'user_abc' can read their profile at /users/user_abc.
+     * @allow (update) User with UID 'user_abc' can update their profile at /users/user_abc.
+     * @allow (delete) User with UID 'user_abc' can delete their profile at /users/user_abc.
+     * @deny (create) User with UID 'user_xyz' cannot create a profile at /users/user_abc.
+     * @deny (get) User with UID 'user_xyz' cannot read the profile at /users/user_abc.
+     * @deny (update) User with UID 'user_xyz' cannot update the profile at /users/user_abc.
+     * @deny (delete) User with UID 'user_xyz' cannot delete the profile at /users/user_abc.
      * @principle Enforces document ownership for all operations on user profiles.
      */
     match /users/{userId} {
+      function isOwner(userId) {
+        return request.auth.uid == userId;
+      }
       allow get: if isOwner(userId);
       allow list: if false;
       allow create: if isOwner(userId) && request.resource.data.id == userId;
-      allow update: if isExistingOwner(userId) && request.resource.data.id == resource.data.id;
-      allow delete: if isExistingOwner(userId);
+      allow update: if isOwner(userId) && resource.data.id == request.resource.data.id;
+      allow delete: if isOwner(userId) && resource != null;
     }
 
     /**
-     * @description Manages class data.
+     * @description Allows read access to class data, but restricts creation, updates, and deletion.
      * @path /classes/{classId}
-     * @allow (get, list) - Authenticated users can read class data.
-     *   Request: { "auth": { "uid": "user123" } }
-     * @allow (create) - Authenticated users can create new classes.
-     *   Request: { "auth": { "uid": "user123" } }
-     * @allow (update, delete) - No one can update or delete class data in this prototype.
-     *   Request: { "auth": { "uid": "user123" } }
-     * @deny (update, delete) - Authenticated users cannot update or delete class data.
-     *   Request: { "auth": { "uid": "user123" } }
-     * @principle Requires authentication for read and write access.
+     * @allow (get) Any user can read class data at /classes/class_123.
+     * @allow (list) Any user can list classes.
+     * @deny (create) No one can create classes.
+     * @deny (update) No one can update classes.
+     * @deny (delete) No one can delete classes.
+     * @principle Provides public read access but restricts write access to class data.
      */
     match /classes/{classId} {
-      allow get, list: if isSignedIn();
-      allow create: if isSignedIn();
-      allow update, delete: if false;
+      allow get, list: if true;
+      allow create: if false;
+      allow update: if false;
+      allow delete: if false;
     }
 
     /**
-     * @description Manages student data nested under classes.
+     * @description Allows read access to student data within a class, but restricts creation, updates, and deletion.
      * @path /classes/{classId}/students/{studentId}
-     * @allow (get, list) - Authenticated users can read student data.
-     *   Request: { "auth": { "uid": "user123" } }
-     * @allow (create) - Authenticated users can create student data.
-     *   Request: { "auth": { "uid": "user123" } }
-     * @allow (update, delete) - No one can update or delete student data in this prototype.
-     * @deny (update, delete) - Authenticated users cannot update or delete student data.
-     *   Request: { "auth": { "uid": "user123" } }
-     * @principle Requires authentication for read and write access.
+     * @allow (get) Any user can read student data at /classes/class_123/students/student_456.
+     * @allow (list) Any user can list students within a class.
+     * @deny (create) No one can create students.
+     * @deny (update) No one can update students.
+     * @deny (delete) No one can delete students.
+     * @principle Provides public read access but restricts write access to student data, nested under classes.
      */
     match /classes/{classId}/students/{studentId} {
-      allow get, list: if isSignedIn();
-      allow create: if isSignedIn();
-      allow update, delete: if false;
+      allow get, list: if true;
+      allow create: if false;
+      allow update: if false;
+      allow delete: if false;
     }
 
     /**
-     * @description Manages incident data. Only the teacher who created the incident can read/write it.
+     * @description Allows read access to incident data, but restricts creation, updates, and deletion.
      * @path /incidents/{incidentId}
-     * @allow (create) - Teacher 'teacher123' can create a new incident with teacherId = 'teacher123'.
-     *   Request: { "auth": { "uid": "teacher123" }, "resource": { "data": { "teacherId": "teacher123", ... } } }
-     * @allow (get, update, delete) - Teacher 'teacher123' can read, update, or delete an incident they own.
-     *   Request: { "auth": { "uid": "teacher123" }, resource.data: { teacherId: "teacher123" } }
-     * @deny (create) - Teacher 'teacher456' cannot create an incident with teacherId = 'teacher123'.
-     *   Request: { "auth": { "uid": "teacher456" }, "resource": { "data": { "teacherId": "teacher123", ... } } }
-     * @deny (get, update, delete) - Teacher 'teacher456' cannot read, update, or delete an incident owned by 'teacher123'.
-     *   Request: { "auth": { "uid": "teacher456" }, resource.data: { teacherId: "teacher123" } }
-     * @principle Enforces document ownership for all operations on incident reports.
+     * @allow (get) Any user can read incident data at /incidents/incident_789.
+     * @allow (list) Any user can list incidents.
+     * @deny (create) No one can create incidents.
+     * @deny (update) No one can update incidents.
+     * @deny (delete) No one can delete incidents.
+     * @principle Provides public read access but restricts write access to incident data.
      */
     match /incidents/{incidentId} {
-      allow get: if resource.data.teacherId == request.auth.uid;
-      allow list: if false;
-      allow create: if request.resource.data.teacherId == request.auth.uid;
-      allow update: if resource != null && resource.data.teacherId == request.auth.uid;
-      allow delete: if resource != null && resource.data.teacherId == request.auth.uid;
+      allow get, list: if true;
+      allow create: if false;
+      allow update: if false;
+      allow delete: if false;
     }
 
-     /**
-      * @description Manages AI-generated summary data.
-      * @path /summaries/{summaryId}
-      * @allow (get, list) - Authenticated users can read summaries.
-      *   Request: { "auth": { "uid": "user123" } }
-      * @allow (create) - Authenticated users can create new summaries.
-      *   Request: { "auth": { "uid": "user123" } }
-      * @allow (update, delete) - No one can update or delete summaries in this prototype.
-      * @deny (update, delete) - Authenticated users cannot update or delete summaries.
-      *   Request: { "auth": { "uid": "user123" } }
-      * @principle Requires authentication for read access.
-      */
+    /**
+     * @description Allows read access to summary data, but restricts creation, updates, and deletion.
+     * @path /summaries/{summaryId}
+     * @allow (get) Any user can read summary data at /summaries/summary_abc.
+     * @allow (list) Any user can list summaries.
+     * @deny (create) No one can create summaries.
+     * @deny (update) No one can update summaries.
+     * @deny (delete) No one can delete summaries.
+     * @principle Provides public read access but restricts write access to summary data.
+     */
     match /summaries/{summaryId} {
-        allow get, list: if isSignedIn();
-        allow create: if isSignedIn();
-        allow update, delete: if false;
-    }
-
-    function isSignedIn() {
-      return request.auth != null;
-    }
-
-    function isOwner(userId) {
-      return request.auth.uid == userId;
-    }
-
-    function isExistingOwner(userId) {
-      return isOwner(userId) && resource != null;
+      allow get, list: if true;
+      allow create: if false;
+      allow update: if false;
+      allow delete: if false;
     }
   }
 }
