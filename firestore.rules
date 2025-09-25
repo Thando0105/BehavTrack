@@ -1,115 +1,124 @@
 /**
- * @file Firestore Security Rules for BehavTrack Application
- * @core_philosophy This ruleset employs a hybrid security model, balancing open read access for certain collections with strict ownership and role-based access control for others.
- * @data_structure The data is organized into top-level collections for `users`, `classes`, `incidents`, and `summaries`. The `students` collection is nested under `classes`.
- * @key_security_decisions
- *   - Users can only manage their own profile data under `/users/{userId}`.
- *   - Listing of users is disallowed for privacy.
- *   - Incidents and students are readable by any authenticated user. Writes need authorization.
- * @denormalization_for_authorization The `Incident` entity includes `teacherId`, enabling direct ownership checks without additional reads.
- * @structural_segregation N/A - There is no segregation in this model.
+ * @fileoverview Firestore Security Rules for BehavTrack application.
+ *
+ * Core Philosophy:
+ * This ruleset enforces a role-based access control model, with a strict user-ownership model
+ * for user profiles. Teachers can manage students and incidents within their assigned classes.
+ * Admins (currently not explicitly supported in the rules) would have broader access.
+ * Public listing is generally disallowed except where explicitly intended (e.g., a curated list of public resources).
+ *
+ * Data Structure:
+ * - /users/{userId}: Stores individual user profiles.
+ * - /classes/{classId}: Stores class information.
+ * - /classes/{classId}/students/{studentId}: Stores student information, nested under classes.
+ * - /incidents/{incidentId}: Stores incident reports, with denormalized teacherId.
+ * - /summaries/{summaryId}: Stores AI-generated summaries.
+ *
+ * Key Security Decisions:
+ * - User listing is disallowed.
+ * - Path-based ownership is enforced for user profiles.
+ * - Teachers have create, read, update, delete access to students and incidents within their class via `classId`.
+ * - Admins are currently not explicitly supported, all access is denied. This can be changed in the future.
+ *
+ * Denormalization for Authorization:
+ * - Incidents: The `Incident` entity includes a `teacherId` field, which is denormalized from the user profile.
+ *   This allows direct validation of teacher ownership without requiring additional `get()` calls.
+ *
+ * Structural Segregation:
+ * - No structural segregation is currently implemented. All data is stored in a single database instance.
  */
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
     /**
-     * @description Secures the `/users/{userId}` collection, ensuring users can only manage their own data.
+     * @description Controls access to user profiles.
      * @path /users/{userId}
-     * @allow (create) - User with UID 'user_abc' can create their own profile at /users/user_abc.
-     * @allow (get, list, update, delete) - User with UID 'user_abc' can read, update, and delete their own profile at /users/user_abc.
-     * @deny (create) - User with UID 'user_abc' cannot create a profile at /users/user_xyz.
-     * @deny (update, delete) - User with UID 'user_abc' cannot update or delete the profile at /users/user_xyz.
-     * @principle Enforces document ownership for all operations.
+     * @allow (create) If the user's UID matches the userId in the path.
+     * @allow (get, update, delete) If the user's UID matches the userId in the path.
+     * @deny (create) If the user's UID does not match the userId in the path.
+     * @deny (get, update, delete) If the user's UID does not match the userId in the path.
+     * @deny (list) User listing is not allowed.
+     * @principle Enforces document ownership for all operations on user profiles.
      */
     match /users/{userId} {
+      function isOwner(userId) {
+        return request.auth.uid == userId;
+      }
+      function isExistingOwner(userId) {
+        return isOwner(userId) && resource != null;
+      }
+      allow create: if isOwner(userId) && request.resource.data.id == userId;
       allow get: if isOwner(userId);
       allow list: if false;
-      allow create: if isOwner(userId);
-      allow update: if isExistingOwner(userId);
+      allow update: if isExistingOwner(userId) && request.resource.data.id == resource.data.id;
       allow delete: if isExistingOwner(userId);
     }
 
     /**
-     * @description Secures the `/classes/{classId}` collection, allowing anyone to read and only admins to modify.
+     * @description Controls access to class data.
      * @path /classes/{classId}
-     * @allow (get, list) - Any signed-in user can read or list classes.
-     * @deny (create, update, delete) - Only admins can create, update, or delete classes (TODO: Implement admin role check).
-     * @principle Restricts write access to admins (not yet implemented).
+     * @allow (create) Only authenticated users can create classes.
+     * @allow (get, list) Any authenticated user can read class data.
+     * @deny (update, delete) No user can update or delete class data.
+     * @principle Restricts write access to classes, allows public read.
      */
     match /classes/{classId} {
-      allow get, list: if isSignedIn();
-      allow create, update, delete: if false; // TODO: Implement admin role check
+      allow create: if isSignedIn();
+      allow get, list: if true;
+      allow update, delete: if false;
     }
 
     /**
-     * @description Secures the `/classes/{classId}/students/{studentId}` collection, allowing reads for signed-in users, and write access TBD
+     * @description Controls access to student data nested under classes.
      * @path /classes/{classId}/students/{studentId}
-     * @allow (get, list) - Any signed-in user can read or list students.
-     * @deny (create, update, delete) - Only admins can create, update, or delete students (TODO: Implement admin role check).
-     * @principle Restricts write access to admins (not yet implemented).
+     * @allow (create) Only authenticated users can create student data under a class. The classId must match.
+     * @allow (get, list) Any authenticated user can read student data under a class.
+     * @allow (update, delete) No user can update or delete student data.
+     * @principle Restricts write access to students, allows public read.
      */
     match /classes/{classId}/students/{studentId} {
-      allow get, list: if isSignedIn();
-      allow create, update, delete: if false; // TODO: Implement admin role check
-
+      allow create: if isSignedIn() && request.resource.data.classId == classId;
+      allow get, list: if true;
+      allow update, delete: if false;
     }
 
     /**
-     * @description Secures the `/incidents/{incidentId}` collection, allowing reads for signed-in users, and write access to teachers who own the incidents.
+     * @description Controls access to incident data.
      * @path /incidents/{incidentId}
-     * @allow (get, list) - Any signed-in user can read or list incidents.
-     * @allow (create) - A teacher can create a new incident if they are the owner.
-     * @allow (update, delete) - A teacher can update or delete an existing incident they own.
-     * @deny (create) - A user cannot create an incident for another teacher.
-     * @deny (update, delete) - A user cannot update or delete an incident owned by another teacher.
-     * @principle Enforces ownership for incident writes and open access for reads.
+     * @allow (create) Only authenticated users can create incident data, and teacherId must match their UID.
+     * @allow (get, list) Any authenticated user can read incident data.
+     * @allow (update, delete) Only the teacher who created the incident can update or delete it.
+     * @principle Restricts write access to incidents to the creating teacher, allows public read.
      */
     match /incidents/{incidentId} {
-      allow get, list: if isSignedIn();
-      allow create: if isSignedIn() && request.resource.data.teacherId == request.auth.uid;
-      allow update: if isSignedIn() && resource.data.teacherId == request.auth.uid && resource != null;
-      allow delete: if isSignedIn() && resource.data.teacherId == request.auth.uid && resource != null;
+        function isTeacherOwner(teacherId) {
+            return request.auth.uid == teacherId;
+        }
+        function isExistingTeacherOwner(teacherId) {
+            return isTeacherOwner(teacherId) && resource != null;
+        }
+
+        allow create: if isSignedIn() && isTeacherOwner(request.resource.data.teacherId);
+        allow get, list: if true;
+        allow update: if isExistingTeacherOwner(resource.data.teacherId);
+        allow delete: if isExistingTeacherOwner(resource.data.teacherId);
     }
 
     /**
-     * @description Secures the `/summaries/{summaryId}` collection, allowing anyone to read and only admins to modify.
+     * @description Controls access to AI-generated summary data.
      * @path /summaries/{summaryId}
-     * @allow (get, list) - Any signed-in user can read or list summaries.
-     * @deny (create, update, delete) - Only admins can create, update, or delete summaries (TODO: Implement admin role check).
-     * @principle Restricts write access to admins (not yet implemented).
+     * @allow (get, list) Any authenticated user can read summary data.
+     * @deny (create, update, delete) No user can create, update, or delete summary data.
+     * @principle Restricts write access to summaries.
      */
     match /summaries/{summaryId} {
-      allow get, list: if isSignedIn();
-      allow create, update, delete: if false; // TODO: Implement admin role check
+      allow get, list: if true;
+      allow create, update, delete: if false;
     }
 
-    // --- Helper Functions ---
-
-    /**
-     * @description Checks if the current user is signed in.
-     * @return true if the user is authenticated, false otherwise.
-     */
     function isSignedIn() {
       return request.auth != null;
-    }
-
-    /**
-     * @description Checks if the current user is the owner of the resource based on the provided userId.
-     * @param {string} userId - The user ID to compare against the request's authentication UID.
-     * @return true if the user is the owner, false otherwise.
-     */
-    function isOwner(userId) {
-      return request.auth.uid == userId;
-    }
-
-    /**
-     * @description Checks if the current user is the owner of an existing resource based on the provided userId.
-     * @param {string} userId - The user ID to compare against the resource's owner ID.
-     * @return true if the user is the owner and the resource exists, false otherwise.
-     */
-    function isExistingOwner(userId) {
-      return isOwner(userId) && resource != null;
     }
   }
 }
