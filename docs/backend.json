@@ -7,13 +7,9 @@
       "type": "object",
       "description": "Represents a user within the BehavTrack application.",
       "properties": {
-        "id": {
-          "type": "string",
-          "description": "Unique identifier for the user entity."
-        },
         "uid": {
           "type": "string",
-          "description": "The user's unique ID from Firebase Authentication."
+          "description": "The user's unique ID from Firebase Authentication. This is also the document ID."
         },
         "email": {
           "type": "string",
@@ -26,11 +22,10 @@
         },
         "classId": {
           "type": "string",
-          "description": "Reference to the Class entity for teachers. (Relationship: Class 1:N User). Nullable for admins."
+          "description": "For teachers, the ID of the class they are assigned to."
         }
       },
       "required": [
-        "id",
         "uid",
         "email",
         "role"
@@ -56,7 +51,7 @@
         },
         "classId": {
           "type": "string",
-          "description": "Reference to the Class entity this student belongs to. (Relationship: Class 1:N Student)"
+          "description": "The ID of the class this student belongs to."
         }
       },
       "required": [
@@ -78,7 +73,11 @@
         },
         "studentId": {
           "type": "string",
-          "description": "Reference to the Student entity involved in the incident. (Relationship: Student 1:N Incident)"
+          "description": "The ID of the student involved in the incident."
+        },
+        "classId": {
+          "type": "string",
+          "description": "The ID of the class the student belongs to. Used for rule validation."
         },
         "dateTime": {
           "type": "string",
@@ -87,7 +86,7 @@
         },
         "teacherId": {
           "type": "string",
-          "description": "Reference to the User entity (teacher) who logged the incident. (Relationship: User 1:N Incident)"
+          "description": "The UID of the teacher who logged the incident."
         },
         "severity": {
           "type": "string",
@@ -101,6 +100,7 @@
       "required": [
         "id",
         "studentId",
+        "classId",
         "dateTime",
         "teacherId",
         "severity",
@@ -119,7 +119,11 @@
         },
         "studentId": {
           "type": "string",
-          "description": "Reference to the Student entity this summary is for. (Relationship: Student 1:N Summary)"
+          "description": "The ID of the student this summary is for."
+        },
+         "classId": {
+          "type": "string",
+          "description": "The ID of the class the student belongs to. Used for rule validation."
         },
         "weekStart": {
           "type": "string",
@@ -138,29 +142,10 @@
       "required": [
         "id",
         "studentId",
+        "classId",
         "weekStart",
         "summaryText",
         "suggestedActions"
-      ]
-    },
-    "Class": {
-      "$schema": "http://json-schema.org/draft-07/schema#",
-      "title": "Class",
-      "type": "object",
-      "description": "Represents a class to which students and teachers are associated.",
-      "properties": {
-        "id": {
-          "type": "string",
-          "description": "Unique identifier for the Class entity."
-        },
-        "name": {
-          "type": "string",
-          "description": "The name of the class."
-        }
-      },
-      "required": [
-        "id",
-        "name"
       ]
     }
   },
@@ -175,25 +160,19 @@
       "schema": {
         "$ref": "#/entities/User"
       },
-      "description": "Stores user data. Uses path-based ownership for access control."
+      "description": "Stores user data. Document ID must be the user's UID."
     },
-    "/classes/{classId}": {
-      "schema": {
-        "$ref": "#/entities/Class"
-      },
-      "description": "Stores class data."
-    },
-    "/classes/{classId}/students/{studentId}": {
+    "/students/{studentId}": {
       "schema": {
         "$ref": "#/entities/Student"
       },
-      "description": "Stores student data. Organized under classes for easy querying.  Includes denormalized 'classId'."
+      "description": "Stores student data."
     },
     "/incidents/{incidentId}": {
       "schema": {
         "$ref": "#/entities/Incident"
       },
-      "description": "Stores incident data. Includes denormalized 'teacherId' and 'classId' for authorization independence."
+      "description": "Stores incident data."
     },
     "/summaries/{summaryId}": {
       "schema": {
