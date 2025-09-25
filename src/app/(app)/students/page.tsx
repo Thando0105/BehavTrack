@@ -5,7 +5,7 @@ import { AppHeader } from '@/components/app-header';
 import { StudentRoster } from '@/components/student-roster';
 import { useFirebase, useCollection, useDoc, useMemoFirebase } from '@/firebase';
 import type { User as UserData, Student } from '@/lib/types';
-import { doc, collection, query, collectionGroup } from 'firebase/firestore';
+import { doc, collection, query } from 'firebase/firestore';
 import { redirect } from 'next/navigation';
 
 export default function StudentsPage() {
@@ -21,7 +21,8 @@ export default function StudentsPage() {
     () => {
       // Only construct the query if firestore is ready and the user data is loaded and confirms the user is an admin.
       if (firestore && userData?.role === 'admin') {
-        return query(collectionGroup(firestore, 'students'));
+        // Query the root 'students' collection for admins.
+        return query(collection(firestore, 'students'));
       }
       // For any other case (loading, not an admin, etc.), return null to prevent the query.
       return null;
