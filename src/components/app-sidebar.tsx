@@ -1,5 +1,5 @@
 'use client';
-import { School, LayoutDashboard, Users, BarChart3, Settings, LogOut } from 'lucide-react';
+import { School, LayoutDashboard, Users, BarChart3, Settings, LogOut, Briefcase } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useFirebase, useDoc, useMemoFirebase } from '@/firebase';
@@ -38,7 +38,8 @@ export function AppSidebar() {
 
   const menuItems = [
     { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-    { href: '/students', label: 'Students', icon: Users, disabled: role !== 'admin' }, // Students link enabled for admins
+    { href: '/students', label: 'Students', icon: Users, adminOnly: true },
+    { href: '/manage-teachers', label: 'Teachers', icon: Briefcase, adminOnly: true },
     { href: '/reports', label: 'Reports', icon: BarChart3, adminOnly: true },
     { href: '/settings', label: 'Settings', icon: Settings },
   ].filter(item => !(item.adminOnly && role !== 'admin'));
@@ -62,9 +63,7 @@ export function AppSidebar() {
             <SidebarMenuItem key={item.label}>
               <SidebarMenuButton
                 asChild
-                disabled={item.disabled}
                 isActive={pathname === item.href}
-                className={cn(pathname === item.href && "font-semibold")}
               >
                 <Link href={item.href}>
                   <item.icon className="h-5 w-5" />

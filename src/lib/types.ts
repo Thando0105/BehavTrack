@@ -8,6 +8,7 @@ export interface User {
   role: UserRole;
   avatarUrl?: string;
   classId?: string; // Only for teachers
+  status?: 'pending' | 'active'; // Status for teacher onboarding
 }
 
 export interface Student {

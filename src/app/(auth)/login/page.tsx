@@ -4,17 +4,15 @@ import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { School, Loader2 } from 'lucide-react';
 import {
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
-  getAuth,
   AuthError,
 } from 'firebase/auth';
-import { doc, setDoc } from 'firebase/firestore';
-import { useFirebase, useFirestore } from '@/firebase';
+import { doc, setDoc, getDoc } from 'firebase/firestore';
+import { useFirebase, setDocumentNonBlocking } from '@/firebase';
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -23,7 +21,6 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { useToast } from '@/hooks/use-toast';
-import { setDocumentNonBlocking } from '@/firebase/non-blocking-updates';
 
 const loginSchema = z.object({
   email: z.string().email({ message: 'Invalid email address.' }),
@@ -32,10 +29,8 @@ const loginSchema = z.object({
 
 const signupSchema = loginSchema.extend({
   role: z.enum(['teacher', 'admin'], { required_error: 'You must select a role.' }),
-  classId: z.string().optional(),
-}).refine(data => data.role === 'admin' || (data.role === 'teacher' && data.classId), {
-  message: "Class ID is required for teachers.",
-  path: ["classId"],
+}).refine(data => data.role === 'admin' || data.role === 'teacher', {
+  message: "Something went wrong.",
 });
 
 
@@ -45,7 +40,6 @@ type SignupFormData = z.infer<typeof signupSchema>;
 export default function LoginPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [isTeacher, setIsTeacher] = useState(false);
   const router = useRouter();
   const { toast } = useToast();
   const { auth, firestore } = useFirebase();
@@ -58,10 +52,6 @@ export default function LoginPage() {
     resolver: zodResolver(signupSchema),
   });
   
-  const handleRoleChange = (value: "teacher" | "admin") => {
-    setIsTeacher(value === "teacher");
-    signupForm.setValue("role", value);
-  };
 
   const handleAuthError = (err: AuthError) => {
     switch (err.code) {
@@ -93,6 +83,24 @@ export default function LoginPage() {
     setIsLoading(true);
     setError(null);
     try {
+      // Check if user has been pre-registered by an admin
+      const preRegisteredUserRef = doc(firestore, 'users', data.email);
+      const preRegisteredUserSnap = await getDoc(preRegisteredUserRef);
+
+      let userData: { role: string; classId?: string; } = { role: data.role };
+
+      if (preRegisteredUserSnap.exists()) {
+        const preRegisteredData = preRegisteredUserSnap.data();
+        if (preRegisteredData.role === 'teacher') {
+            userData = {
+                role: 'teacher',
+                classId: preRegisteredData.classId
+            };
+        }
+      } else if (data.role === 'teacher') {
+        throw new Error("Teacher accounts must be created by an administrator.");
+      }
+
       const userCredential = await createUserWithEmailAndPassword(auth, data.email, data.password);
       const user = userCredential.user;
 
@@ -101,8 +109,7 @@ export default function LoginPage() {
       const newUser = {
         uid: user.uid,
         email: user.email,
-        role: data.role,
-        ...(data.role === 'teacher' && { classId: data.classId }),
+        ...userData,
       };
 
       setDocumentNonBlocking(userDocRef, newUser, { merge: true });
@@ -113,7 +120,11 @@ export default function LoginPage() {
       });
       router.push('/dashboard');
     } catch (err: any) {
-      setError(handleAuthError(err));
+      if (err instanceof Error) {
+        setError(err.message);
+      } else {
+        setError(handleAuthError(err));
+      }
     } finally {
       setIsLoading(false);
     }
@@ -170,7 +181,7 @@ export default function LoginPage() {
                   </div>
                   <div className="space-y-2">
                     <Label>Role</Label>
-                    <RadioGroup onValueChange={handleRoleChange} className="flex gap-4">
+                    <RadioGroup defaultValue='teacher' onValueChange={(value: "teacher" | "admin") => signupForm.setValue("role", value)} className="flex gap-4">
                       <div className="flex items-center space-x-2">
                         <RadioGroupItem value="teacher" id="r-teacher" />
                         <Label htmlFor="r-teacher">Teacher</Label>
@@ -180,16 +191,9 @@ export default function LoginPage() {
                         <Label htmlFor="r-admin">Admin</Label>
                       </div>
                     </RadioGroup>
+                    <p className='text-xs text-muted-foreground pt-1'>Teacher accounts must be pre-registered by an administrator.</p>
                     {signupForm.formState.errors.role && <p className="text-sm text-destructive">{signupForm.formState.errors.role.message}</p>}
                   </div>
-
-                  {isTeacher && (
-                    <div className="space-y-2">
-                      <Label htmlFor="classId">Class ID</Label>
-                      <Input id="classId" placeholder="e.g., C101" {...signupForm.register('classId')} />
-                      {signupForm.formState.errors.classId && <p className="text-sm text-destructive">{signupForm.formState.errors.classId.message}</p>}
-                    </div>
-                  )}
 
                   {error && <p className="text-center text-sm text-destructive">{error}</p>}
                   <Button type="submit" className="w-full" disabled={isLoading}>
